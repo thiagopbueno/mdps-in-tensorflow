@@ -60,7 +60,7 @@ def plot_policy(ax, grid, deceleration, action_grid, actions, timestep):
     end = grid['goal']
     ax.plot([end[0]], [end[1]], marker='X', markersize=15, color='crimson', label='goal')
 
-def plot_simulation(ax, grid, deceleration, start, end, s_series, a_series):
+def plot_trajectory(ax, grid, deceleration, start, end, s_series, a_series):
 
     # plot grid
     plot_grid(ax, grid)
@@ -82,3 +82,15 @@ def plot_simulation(ax, grid, deceleration, start, end, s_series, a_series):
     # plot start and end positions
     ax.plot([start[0]], [start[1]], marker='X', markersize=15, color='limegreen', label='initial')
     ax.plot([end[0]], [end[1]], marker='X', markersize=15, color='crimson', label='goal')
+
+def plot_simulations(fig, grid, deceleration, initial_states, delta_y, states, actions):
+    start, end = grid['start'], grid['goal']
+    num_plots = int(initial_states.shape[0])
+    deltas = [0] + delta_y
+    rows = len(delta_y)
+    cols = num_plots // len(delta_y)
+    for i in range(num_plots):
+        ax = fig.add_subplot(len(deltas), num_plots/len(delta_y), i + 1)
+        idx = i//cols
+        start = (grid['start'][0], grid['start'][1] + delta_y[idx])
+        plot_trajectory(ax, grid, deceleration, start, end, states[i], actions[i])
