@@ -3,12 +3,26 @@ import numpy as np
 
 # Data visualization helper functions
 
-def plot_loss_function(ax, losses, epoch):
+def plot_loss_function(ax, losses, epoch, title=None):
     ax.plot(losses, 'b-')
     ax.set_xlim(0, epoch)
-    ax.set_title('Total Loss')
+    if title is None:
+        ax.set_title('Loss function')
+    else:
+        ax.set_title('Loss function ({})'.format(title))
     ax.set_xlabel("# iterations")
-    ax.set_ylabel("total loss")
+    ax.set_ylabel("loss")
+    ax.grid()
+
+def plot_average_total_cost(ax, totals, epoch, title=None):
+    ax.plot(totals, 'b-')
+    ax.set_xlim(0, epoch)
+    if title is None:
+        ax.set_title('Average Total Cost')
+    else:
+        ax.set_title('Average Total Cost ({})'.format(title))
+    ax.set_xlabel("# iterations")
+    ax.set_ylabel("total")
     ax.grid()
 
 def plot_total_cost_per_batch(ax, total_cost):
@@ -69,7 +83,6 @@ def plot_trajectory(ax, grid, deceleration, start, end, s_series, a_series):
     plot_deceleration(ax, grid, deceleration)
 
     # plot actions
-    s_series = [ s[:-1] for s in s_series ]
     positions = np.concatenate([[start], s_series])
     ax.quiver(positions[:-1, 0], positions[:-1, 1], a_series[:, 0], a_series[:, 1],
               angles='xy', scale_units='xy', scale=1, color='dodgerblue', width=0.005,
