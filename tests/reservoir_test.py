@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 import os
 import shutil
-from src.Reservoir import Reservoir  # noqa
+from src.Reservoir import Reservoir_non_linear  # noqa
 
 class ReservoirTest(unittest.TestCase):
     """
@@ -23,7 +23,7 @@ class ReservoirTest(unittest.TestCase):
                             'initial_states': [105.0,
                                                105.0,
                                                105.0]}
-        cls.reservoir =  Reservoir(graph, cls.reserv_dict)
+        cls.reservoir =  Reservoir_non_linear(graph, cls.reserv_dict)
 
     def test_Reservoir_reward(self):
         """

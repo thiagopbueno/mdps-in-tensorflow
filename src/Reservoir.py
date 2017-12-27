@@ -9,7 +9,7 @@ except ImportError:
 
 
 
-class Reservoir(MDP):
+class Reservoir_non_linear(MDP):
     """
     Class that encodes a mnp reservoir scenario
 
