@@ -115,6 +115,5 @@ class Navigation(mdp.TF_MDP):
             with tf.name_scope("reward"):
                 # norm L-2 (euclidean distance)
                 r = -tf.sqrt(tf.reduce_sum(tf.square(state - self.__goal), axis=1, keep_dims=True), name="r")
-                print(r)
 
         return r
