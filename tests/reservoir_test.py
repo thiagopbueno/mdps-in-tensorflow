@@ -39,7 +39,11 @@ class ReservoirTest(unittest.TestCase):
                                              10.0],
                             'initial_states': [105.0,
                                                105.0,
-                                               105.0]}
+                                               105.0],
+                            'rain_mean': 5.0,
+                            'rain_std': 1.,
+                            'evaporation_std': 5.}
+
         cls.reservoir =  reservoir.Reservoir_non_linear(graph, cls.reserv_dict)
 
     def test_reward_is_zero_when_state_is_middle_point(self):
