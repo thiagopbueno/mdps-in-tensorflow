@@ -13,12 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-import tf_mdp.models.mdp as mdp
+from tf_mdp.models.mdp import MDP
 
 import numpy as np
 import tensorflow as tf
 
-class Navigation(mdp.TF_MDP):
+class Navigation(MDP):
     """
     Navigation 2D domain: an agent is supposed to get to a goal position
     from a start position, subject to noisy directions and deceleration zones,

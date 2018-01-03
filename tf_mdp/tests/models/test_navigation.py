@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-from tf_mdp.models import mdp
+from tf_mdp.models.mdp import MDP
 from tf_mdp.models.navigation import navigation
 
 import numpy as np
@@ -79,8 +79,8 @@ class TestNavigation(unittest.TestCase):
 
 
     def test_model_is_subclass_of_tf_mdp(self):
-        self.assertTrue(issubclass(self.model.__class__, mdp.TF_MDP))
-        self.assertTrue(isinstance(self.model, mdp.TF_MDP))
+        self.assertTrue(issubclass(self.model.__class__, MDP))
+        self.assertTrue(isinstance(self.model, MDP))
 
     def test_model_uses_given_graph(self):
         self.assertTrue(self.model.graph is self.graph)
