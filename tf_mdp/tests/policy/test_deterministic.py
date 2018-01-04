@@ -34,15 +34,13 @@ class TestDeterministicPolicyNetwork(unittest.TestCase):
             cls.timestep = tf.cast(tf.random_uniform((cls.batch_size, 1), minval=0, maxval=cls.max_time, dtype=tf.int32, name="timestep"), tf.float32)
             cls.inputs = tf.concat([cls.state, cls.timestep], axis=1, name="inputs")
 
-        cls.shape = (3, 20, 10, 5, 2)
+        cls.policy_shape = (3, 20, 10, 5, 2)
         cls.bounds = 2.0
-        cls.policy = DeterministicPolicyNetwork(cls.graph, cls.shape, cls.bounds)
+        cls.policy = DeterministicPolicyNetwork(cls.graph, cls.policy_shape, cls.bounds)
         cls.action = cls.policy(cls.inputs)
 
-        cls.scopes = cls.get_all_scopes()
-
     def setUp(self):
-        with self.policy.graph.as_default():
+        with self.graph.as_default():
             self.sess = tf.Session()
             self.sess.run(tf.global_variables_initializer())
 
@@ -62,7 +60,7 @@ class TestDeterministicPolicyNetwork(unittest.TestCase):
 
     def get_and_check_tensor(self, name, shape, dtype=tf.float32):
         tensor = self.policy.graph.get_tensor_by_name(name)
-        self.assertEqual(tensor.shape, tf.TensorShape(shape))
+        self.assertEqual(tensor.shape.as_list(), list(shape))
         self.assertEqual(tensor.dtype, dtype)
         return tensor
 
@@ -71,25 +69,35 @@ class TestDeterministicPolicyNetwork(unittest.TestCase):
         self.assertTrue(self.policy.graph is self.graph)
 
     def test_policy_defines_its_namescope(self):
-        self.assertTrue("policy" in self.scopes)
+        self.assertTrue("policy" in self.get_all_scopes())
 
-    def test_policy_net_has_given_number_of_layers(self):
+    def test_policy_net_has_scope_for_each_layer(self):
         number_of_layers = 0
-        for scope in self.scopes:
+        for scope in self.get_all_scopes():
             if re.search(r"^policy/layer\d+$", scope):
                 number_of_layers += 1
-        self.assertEqual(number_of_layers, len(self.shape) - 1)
+        self.assertEqual(number_of_layers, len(self.policy_shape) - 1)
+
+    def test_policy_net_has_given_number_of_parameters(self):
+        policy_size = 0
+        for i, n_h in enumerate(self.policy_shape[1:]):
+            policy_size += n_h * self.policy_shape[i] + n_h
+        self.assertEqual(self.policy.count_params(), policy_size)
+
+    def test_policy_net_has_given_number_of_layers(self):
+        trainable_variables = self.policy.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        self.assertEqual(len(self.policy.layers), len(trainable_variables) / 2)
 
     def test_policy_net_has_given_layers_units_and_activation(self):
-        for i, n_h in enumerate(self.shape[1:-1]):
+        for i, n_h in enumerate(self.policy_shape[1:-1]):
             layer = self.get_and_check_tensor("policy/layer{}/Relu:0".format(str(i + 1)), (self.batch_size, n_h))
-        n_h = self.shape[-1]
-        layer = self.get_and_check_tensor("policy/layer{}/Tanh:0".format(str(len(self.shape) - 1)), (self.batch_size, n_h))
+        n_h = self.policy_shape[-1]
+        layer = self.get_and_check_tensor("policy/layer{}/Tanh:0".format(str(len(self.policy_shape) - 1)), (self.batch_size, n_h))
 
     def test_policy_has_action_as_its_output(self):
-        self.assertTrue(self.action is self.get_and_check_tensor("policy/action:0", (self.batch_size, self.shape[-1])))
+        self.assertTrue(self.action is self.get_and_check_tensor("policy/action:0", (self.batch_size, self.policy_shape[-1])))
 
-        last_layer = self.policy.graph.get_tensor_by_name("policy/layer{}/Tanh:0".format(len(self.shape) - 1))
+        last_layer = self.policy.graph.get_tensor_by_name("policy/layer{}/Tanh:0".format(len(self.policy_shape) - 1))
         bounds = self.get_and_check_tensor("policy/bounds:0", ())
         self.assertTrue(set(self.action.op.inputs), set([last_layer, bounds]))
 
