@@ -41,8 +41,8 @@ class TestMDP_RNN(unittest.TestCase):
         cls.mdp = Navigation(cls.graph, cls.grid)
 
         # Policy Network
-        cls.shape = [cls.mdp.state_size + 1, 20, 5, cls.mdp.action_size]
-        cls.policy = DeterministicPolicyNetwork(cls.graph, cls.shape)
+        cls.policy_shape = [cls.mdp.state_size + 1, 20, 5, cls.mdp.action_size]
+        cls.policy = DeterministicPolicyNetwork(cls.graph, cls.policy_shape)
 
         # RNN
         cls.batch_size = 1000
@@ -60,6 +60,77 @@ class TestMDP_RNN(unittest.TestCase):
     def tearDown(self):
         self.sess.close()
 
+
+    # helper functions
+    @classmethod
+    def get_all_scopes(cls):
+        scopes = set()
+        for op in cls.graph.get_operations():
+            scope = '/'.join(op.name.split('/')[:-1])
+            if scope:
+                scopes.add(scope)
+        return scopes
+
+    @classmethod
+    def graph_has_scope(cls, scope, fullname=False):
+        if fullname:
+            return scope in cls.get_all_scopes()
+
+        for sc in cls.get_all_scopes():
+            if sc.startswith(scope):
+                return True
+        return False
+
+    def get_and_check_tensor(self, name, shape, dtype=tf.float32):
+        tensor = self.graph.get_tensor_by_name(name)
+        self.assertEqual(tensor.shape.as_list(), list(shape))
+        self.assertEqual(tensor.dtype, dtype)
+        return tensor
+
+
     def test_mdp_rnn_uses_given_graph(self):
         self.assertTrue(self.rnn.graph is self.graph)
-        # self.assertTrue(self.rnn.cell.graph is self.graph)
+        self.assertTrue(self.rnn.cell.graph is self.graph)
+
+    def test_mdp_rnn_defines_its_scope(self):
+        self.assertTrue(self.graph_has_scope("mdp_rnn"))
+
+    def test_mdp_rnn_defines_outputs_scope(self):
+        self.assertTrue(self.graph_has_scope("mdp_rnn/outputs"))
+
+    def test_mdp_rnn_cell_defines_output_scope(self):
+        self.assertTrue(self.graph_has_scope("mdp_rnn/while/output"))
+
+    def test_mdp_rnn_cell_encapsulates_policy(self):
+        self.assertTrue(self.graph_has_scope("mdp_rnn/while/policy_cell/policy"))
+
+    def test_mdp_rnn_cell_encapsulates_transition(self):
+        self.assertTrue(self.graph_has_scope("mdp_rnn/while/transition_cell/transition"))
+
+    def test_mdp_rnn_cell_encapsulates_reward(self):
+        self.assertTrue(self.graph_has_scope("mdp_rnn/while/reward_cell/reward"))
+
+    def test_mdp_rnn_cell_defines_its_output_shape_and_size(self):
+        self.assertEqual(self.rnn.cell.output_size, self.mdp.state_size + self.mdp.action_size + 1)
+
+    def test_mdp_rnn_cell_defines_its_hidden_state_size(self):
+        self.assertEqual(self.rnn.cell.state_size, self.mdp.state_size)
+
+    def test_mdp_rnn_cell_augment_state_representation_with_timestep(self):
+        self.sess.run([self.rewards, self.states, self.actions, self.final_state])
+        self.get_and_check_tensor("mdp_rnn/while/policy_cell/state_t:0", (None, 3))
+
+    def test_mdp_rnn_reuse_varibles_in_policy_network(self):
+        trainable_variable_scopes = set()
+        trainable_variables = self.rnn.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        for var in trainable_variables:
+            trainable_variable_scopes.add('/'.join(var.name.split('/')[:-1]))
+        self.assertEqual(len(trainable_variable_scopes), len(self.policy_shape) - 1)
+        self.assertEqual(len(trainable_variables), 2 * len(trainable_variable_scopes))
+
+    def test_mdp_rnn_generates_trajectories_with_given_batch_size_and_horizon(self):
+        rewards, states, actions = self.sess.run([self.rewards, self.states, self.actions])
+        self.assertEqual(rewards.shape, (self.batch_size, self.max_time, 1))
+        self.assertEqual(states.shape,  (self.batch_size, self.max_time, self.mdp.state_size))
+        self.assertEqual(actions.shape, (self.batch_size, self.max_time, self.mdp.action_size))
+
