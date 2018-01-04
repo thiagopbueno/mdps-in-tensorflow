@@ -17,9 +17,10 @@ from tf_mdp.eval.montecarlo import MCPolicyEvaluation
 from tf_mdp.models.navigation.navigation import Navigation
 from tf_mdp.policy.deterministic import DeterministicPolicyNetwork
 
-
+import numpy as np
 import tensorflow as tf
 import unittest
+
 
 class TestMCPolicyEvaluation(unittest.TestCase):
 
@@ -54,13 +55,14 @@ class TestMCPolicyEvaluation(unittest.TestCase):
                                     batch_size=cls.batch_size,
                                     gamma=cls.gamma)
 
-        cls.expected_return, cls.total, cls.rewards, cls.states, cls.actions = cls.mc.eval()
 
     def setUp(self):
-        pass
+        with self.graph.as_default():
+            self.sess = tf.Session()
+            self.sess.run(tf.global_variables_initializer())
 
     def tearDown(self):
-        pass
+        self.sess.close()
 
 
     # helper functions
@@ -75,30 +77,37 @@ class TestMCPolicyEvaluation(unittest.TestCase):
 
     def get_and_check_tensor(self, name, shape, dtype=tf.float32):
         tensor = self.graph.get_tensor_by_name(name)
-        self.assertEqual(tensor.shape, tf.TensorShape(shape))
+        self.assertEqual(tensor.shape.as_list(), list(shape))
         self.assertEqual(tensor.dtype, dtype)
         return tensor
 
-
-    def test_mc_estimator_sample_trajectories_with_given_batch_size_and_horizon(self):
-        self.assertEqual(self.total.shape,   (self.batch_size, 1))
-        self.assertEqual(self.rewards.shape, (self.batch_size, self.max_time, 1))
-        self.assertEqual(self.states.shape,  (self.batch_size, self.max_time, self.mdp.state_size))
-        self.assertEqual(self.actions.shape, (self.batch_size, self.max_time, self.mdp.action_size))
+    def test_mc_estimator_defines_its_scope(self):
+        self.assertTrue("policy_evaluation" in self.get_all_scopes())
 
     def test_mc_estimator_defines_discount_schedule(self):
         discount_schedule = self.get_and_check_tensor("policy_evaluation/discount_schedule:0", (self.batch_size, self.max_time, 1))
-        with tf.Session(graph=self.mdp.graph) as sess:
-            sess.run(tf.global_variables_initializer())
-            discount_schedule = sess.run(discount_schedule)
-            for schedule in discount_schedule:
-                expected_discount_factor = 1.0
-                for discount in schedule:
-                    self.assertAlmostEqual(discount, expected_discount_factor, places=5)
-                    expected_discount_factor *= self.gamma
+        for schedule in self.sess.run(discount_schedule):
+            expected_discount_factor = 1.0
+            for discount in schedule:
+                self.assertAlmostEqual(discount, expected_discount_factor, places=5)
+                expected_discount_factor *= self.gamma
 
-    def test_mc_estimator_evaluates_policy(self):
-        pass
+    def test_mc_estimator_evaluates_metrics_with_given_shapes(self):
+        expected_return, total, rewards = self.mc.eval(self.sess)
+        self.assertEqual(expected_return.shape, (1,))
+        self.assertEqual(total.shape, (self.batch_size, 1))
 
+    def test_mc_estimator_evaluates_metrics_consistenly(self):
+        expected_return, total, rewards = self.mc.eval(self.sess)
+        self.assertAlmostEqual(float(expected_return), float(np.mean(total)), places=4)
 
+        discount_schedule = self.sess.run(self.mc.discount_schedule)
+        returns = np.sum(rewards * discount_schedule, axis=1)
+        for actual_return_per_episode, expected_return_per_episode in zip(total, returns):
+            self.assertAlmostEqual(float(actual_return_per_episode), float(expected_return_per_episode), places=4)
 
+    def test_mc_estimator_sample_complete_trajectories(self):
+        states, actions, rewards = self.mc.sample(self.sess)
+        self.assertEqual(states.shape,  (self.batch_size, self.max_time, self.mdp.state_size))
+        self.assertEqual(actions.shape, (self.batch_size, self.max_time, self.mdp.action_size))
+        self.assertEqual(rewards.shape, (self.batch_size, self.max_time, 1))

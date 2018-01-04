@@ -44,30 +44,56 @@ class MCPolicyEvaluation(object):
         self.batch_size = batch_size
         self.gamma = gamma
 
-        self.__unroll_trajectories()
-        self.__compute_expected_return()
+        with self.mdp.graph.as_default():
+            with tf.name_scope("policy_evaluation"):
+                self._build_trajectory_ops()
+                self._build_evaluation_ops()
 
-    def __unroll_trajectories(self):
+    def _build_trajectory_ops(self):
         self.__initial_state = utils.initial_state(self.initial_state, self.batch_size)
         self.__timesteps = utils.timesteps(self.batch_size, self.max_time)
         self.__rnn = MDP_RNN(self.mdp, self.policy)
         self.rewards, self.states, self.actions, _ = self.__rnn.unroll(self.__initial_state, self.__timesteps)
 
-    def __compute_expected_return(self):
-        with self.mdp.graph.as_default():
-            with tf.name_scope("policy_evaluation"):
-                discount_schedule = np.geomspace(1, self.gamma ** (self.max_time - 1), self.max_time, dtype=np.float32)
-                discount_schedule = np.repeat([discount_schedule], self.batch_size, axis=0)
-                discount_schedule = np.reshape(discount_schedule, (self.batch_size, self.max_time, 1))
-                self.__discount_schedule = tf.constant(discount_schedule, dtype=tf.float32, name="discount_schedule")
-                self.total = tf.reduce_sum(self.rewards * self.__discount_schedule, axis=1, name="total_discount_reward")
-                self.expected_return = tf.reduce_mean(self.total, axis=0, name="expected_return")
+    def _build_evaluation_ops(self):
+        discount_schedule = np.geomspace(1, self.gamma ** (self.max_time - 1), self.max_time, dtype=np.float32)
+        discount_schedule = np.repeat([discount_schedule], self.batch_size, axis=0)
+        discount_schedule = np.reshape(discount_schedule, (self.batch_size, self.max_time, 1))
 
-                print(self.__discount_schedule)
-                print(self.total)
-                print(self.expected_return)
+        self.discount_schedule = tf.constant(discount_schedule, dtype=tf.float32, name="discount_schedule")
+        self.total = tf.reduce_sum(self.rewards * self.discount_schedule, axis=1, name="total_discount_reward")
+        self.expected_return = tf.reduce_mean(self.total, axis=0, name="expected_return")
 
-    def eval(self):
-        with tf.Session(graph=self.mdp.graph) as sess:
-            sess.run(tf.global_variables_initializer())
-            return sess.run([self.expected_return, self.total, self.rewards, self.states, self.actions])
+    def _run(self, tensors, sess=None):
+        if sess is None:
+            with tf.Session(graph=self.mdp.graph) as sess:
+                sess.run(tf.global_variables_initializer())
+                return sess.run(tensors)
+        else:
+            return sess.run(tensors)
+
+    def eval(self, sess=None):
+        """
+        Returns a list of arrays containing:
+            1. an estimate of the value of initial state;
+            2. the total discounted reward of each episode in batch, and
+            3. rewards series for given horizon.
+
+        :param sess: current session, if none, starts a new session
+        :type sess: tf.Session
+        :rtype: list(np.array)
+        """
+        return self._run([self.expected_return, self.total, self.rewards], sess)
+
+    def sample(self, sess=None):
+        """
+        Returns a list of arrays containing samples of:
+            1. state series for given horizon;
+            2. action series for given hofizon; and
+            3. rewards series for given horizon.
+
+        :param sess: current session, if none, starts a new session
+        :type sess: tf.Session
+        :rtype: list(np.array)
+        """
+        return self._run([self.states, self.actions, self.rewards], sess)
