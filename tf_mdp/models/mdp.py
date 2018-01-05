@@ -15,7 +15,6 @@
 
 import abc
 
-
 class MDP(metaclass=abc.ABCMeta):
     """
     Interface to define MDP models through stochastic computation graphs.
