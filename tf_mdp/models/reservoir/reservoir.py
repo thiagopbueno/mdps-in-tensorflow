@@ -19,7 +19,6 @@ import numpy as np
 import tensorflow as tf
 import tf_mdp.models.mdp as mdp
 
-
 class Reservoir(mdp.TF_MDP, metaclass=abc.ABCMeta): # noqa
     """
     Reservoir Control: the agent control multiple connected
