@@ -118,7 +118,7 @@ class StochasticNavigation(Navigation):
                 self.alpha_min, self.alpha_max = config["alpha_min"], config["alpha_max"]
                 self._scale_min = tf.constant(2 * np.pi / 360 * self.alpha_min, dtype=tf.float32, name="scale_min")
                 self._scale_max = tf.constant(2 * np.pi / 360 * self.alpha_max, dtype=tf.float32, name="scale_max")
-        
+
     def transition(self, state, action):
 
         with self.graph.as_default():
