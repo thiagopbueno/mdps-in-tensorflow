@@ -36,6 +36,7 @@ class ReservoirTest(unittest.TestCase):
                            'reward_param': 0.1,
                            'above_penalty': - 100,
                            'below_penalty': - 5}
+
         cls.env_dict = {'rain_mean': 5.0,
                         'rain_std': 1.,
                         'evaporation_std': 5.}
