@@ -1,0 +1,12 @@
+language: python
+sudo: required
+dist: trusty
+python:
+  - "3.5"
+sudo: required
+install:
+  - pip3 install numpy
+  - pip3 install tensorflow
+  - pip3 install matplotlib
+  - pip3 install unittest2
+script: python3 setup.py test
