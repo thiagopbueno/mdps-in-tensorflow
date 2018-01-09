@@ -15,6 +15,7 @@
 
 import abc
 
+
 class PolicyNetwork(metaclass=abc.ABCMeta):
     """
     Policy Network: interface for implementations of parametric policy approximator.

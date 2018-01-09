@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-from tf_mdp.policy.policynet import PolicyNetwork
+from .policynet import PolicyNetwork
 
 import tensorflow as tf
 
