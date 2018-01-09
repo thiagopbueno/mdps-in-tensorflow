@@ -16,6 +16,7 @@
 import abc
 import time
 
+import numpy as np
 import tensorflow as tf
 
 
@@ -31,12 +32,12 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
     :type learning_rate: float
     """
 
-    def __init__(self, graph, loss, total, learning_rate):
+    def __init__(self, graph, metrics, learning_rate):
         self.graph = graph
 
         # performance metrics
-        self.loss = loss
-        self.total = total
+        self.loss = metrics["loss"]
+        self.total = metrics["total"]
 
         # hyperparameters
         self.hyperparameters = {}
@@ -93,14 +94,14 @@ class SGDPolicyOptimizer(PolicyOptimizer):
     :type learning_rate: float
     """
 
-    def __init__(self, graph, loss, total, learning_rate):
-        super().__init__(graph, loss, total, learning_rate)
+    def __init__(self, graph, metrics, learning_rate):
+        super().__init__(graph, metrics, learning_rate)
 
     def _build_optimization_ops(self):
         learning_rate = self.hyperparameters["learning_rate"]
         with tf.name_scope("SGDPolicyOptimizer"):
-            self.__sgd = tf.train.GradientDescentOptimizer(learning_rate)
-            self.train_step = self.__sgd.minimize(self.loss)
+            self._optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+            self.train_step = self._optimizer.minimize(self.loss)
 
     @property
     def learning_rate(self):
@@ -109,4 +110,89 @@ class SGDPolicyOptimizer(PolicyOptimizer):
 
         :rtype: float
         """
-        return self.__sgd._learning_rate
+        return self._optimizer._learning_rate
+
+
+class ActionOptimizer(object):
+    
+    def __init__(self, graph, metrics, learning_rate, limits=None):
+        self.graph = graph
+
+        # performance metrics
+        self.loss = metrics["loss"]
+        self.total = metrics["total"]
+
+        # trajectory metrics
+        self.states = metrics["states"]
+        self.actions = metrics["actions"]
+        self.rewards = metrics["rewards"]
+
+        # hyperparameters
+        self.hyperparameters = {}
+        self.hyperparameters["learning_rate"] = learning_rate
+        self.hyperparameters["limits"] = limits
+
+        with self.graph.as_default():
+            self._build_optimization_ops()
+
+    @property
+    def learning_rate(self):
+        """
+        Returns hyperparameter learning rate.
+
+        :rtype: float
+        """
+        return self._optimizer._learning_rate
+
+    def _build_optimization_ops(self):
+        limits = self.hyperparameters["limits"]
+        self.enforce_action_limits = None
+        if limits is not None:
+            self.enforce_action_limits = tf.assign(
+                                            self.actions,
+                                            tf.clip_by_value(self.actions,
+                                                            limits[0],
+                                                            limits[1]), name="action_limits")
+
+        learning_rate = self.hyperparameters["learning_rate"]
+        with tf.name_scope("ActionOptimizer"):
+            self._optimizer = tf.train.RMSPropOptimizer(learning_rate)
+            self.train_step = self._optimizer.minimize(self.loss)
+
+    def minimize(self, epoch, show_progress=True):
+        start = time.time()
+        with tf.Session(graph=self.graph) as sess:
+
+            sess.run(tf.global_variables_initializer())
+
+            losses = []
+            for epoch_idx in range(epoch):
+                # backprop and update weights
+                sess.run(self.train_step)
+
+                # maintain action constraints if any
+                if self.enforce_action_limits is not None:
+                    sess.run(self.enforce_action_limits)
+
+                # store and show loss information
+                loss = sess.run(self.loss)
+                losses.append(loss)
+                if show_progress:
+                    print('Epoch {0:5}: loss = {1}\r'.format(epoch_idx, loss), end='')
+
+            # index of best solution among all planners
+            with tf.name_scope("best_batch"):
+                best_batch_idx = tf.argmax(self.total, axis=0, name="best_batch_index")
+                best_batch_idx = sess.run(best_batch_idx)
+                best_batch = {
+                    "total":   np.squeeze(sess.run(self.total)[best_batch_idx]),
+                    "actions": np.squeeze(sess.run(self.actions)[best_batch_idx]),
+                    "states":  np.squeeze(sess.run(self.states)[best_batch_idx]),
+                    "rewards": np.squeeze(sess.run(self.rewards)[best_batch_idx])
+                }
+
+        end = time.time()
+        uptime = end - start
+        print("\nDone in {0:.6f} sec.\n".format(uptime))
+
+        return losses, best_batch, uptime

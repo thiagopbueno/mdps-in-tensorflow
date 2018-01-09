@@ -61,8 +61,11 @@ class TestSGDPolicyOptimizer(unittest.TestCase):
 
         # PolicyOptimizer
         cls.learning_rate = 0.01
-        cls.loss = cls.mc.expected_return
-        cls.optimizer = SGDPolicyOptimizer(cls.graph, cls.loss, cls.mc.total, cls.learning_rate)
+        metrics = {
+            "loss":  cls.mc.expected_return,
+            "total": cls.mc.total
+        }
+        cls.optimizer = SGDPolicyOptimizer(cls.graph, metrics, cls.learning_rate)
 
     def test_optimizer_uses_given_graph(self):
         self.assertTrue(self.optimizer.graph is self.graph)

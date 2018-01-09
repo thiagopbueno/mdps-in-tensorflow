@@ -21,9 +21,9 @@ import tensorflow as tf
 
 class Navigation(MDP):
     """
-    Navigation 2D domain: base class for the navigation domain,
+    Navigation: base class for the 2D navigation domain,
     in which an agent is supposed to get to a goal position
-    from a start position.
+    from a start position as fast as possible.
 
     :param graph: computation graph
     :type graph: tf.Graph
@@ -63,9 +63,40 @@ class Navigation(MDP):
     def reward(self, state, action):
         with self.graph.as_default():
             with tf.name_scope("reward"):
-                # norm L-2 (euclidean distance)
                 r = -tf.sqrt(tf.reduce_sum(tf.square(state - self._goal), axis=1, keep_dims=True), name="r")
         return r
+
+
+class DeterministicNavigation(Navigation):
+    """
+    DeterministicNavigation: an agent is supposed to get to a goal position
+    from a start position, subject to deceleration zones.
+
+    :param graph: computation graph
+    :type graph: tf.Graph
+    :param config: problem-dependent configuration
+    :type config: dict
+    """
+
+    def __init__(self, graph, config):
+        super().__init__(graph, config)
+
+    def transition(self, state, action):
+
+        with self.graph.as_default():
+
+            with tf.name_scope("transition"):
+
+                with tf.name_scope("deceleration"):
+                    d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center), 1, keep_dims=True), name="d")
+                    deceleration = self._2_00 / (self._1_00 + tf.exp(-self._decay * d)) - self._1_00
+                    decelerated_action = tf.multiply(deceleration, action, name="decelerated_action")
+
+                with tf.name_scope("next_position"):
+                    p = tf.add(state, decelerated_action, name="p")
+                    next_state = tf.clip_by_value(p, self._grid_lower_bound, self._grid_upper_bound, name="next_state")
+
+        return next_state
 
 
 class StochasticNavigation(Navigation):
@@ -94,7 +125,6 @@ class StochasticNavigation(Navigation):
 
             with tf.name_scope("transition"):
 
-                # sample angular deviation
                 with tf.name_scope("deviation"):
                     velocity = tf.norm(action, axis=1, keep_dims=True, name="velocity")
                     max_velocity = tf.sqrt(2.0, name="max_velocity")
@@ -102,8 +132,7 @@ class StochasticNavigation(Navigation):
                     loc = tf.constant(0.0, name="loc")
                     noise = tf.distributions.Normal(loc=loc, scale=scale, name="noise")
                     alpha = noise.sample(name="alpha")
-                
-                # apply angular deviation to generate noisy action
+
                 with tf.name_scope("direction"):
                     cos, sin = tf.cos(alpha, name="cos_alpha"), tf.sin(alpha, name="sin_alpha")
                     rotation_matrix = tf.stack([cos, -sin, sin, cos], axis=1)
@@ -112,18 +141,12 @@ class StochasticNavigation(Navigation):
                     noisy_action = tf.reshape(noisy_action, [-1, 2], name="noisy_action")
 
                 with tf.name_scope("deceleration"):
-                    # distance to center of deceleration zone
                     d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center), 1, keep_dims=True), name="d")
-                    # deceleration_factor
                     deceleration = self._2_00 / (self._1_00 + tf.exp(-self._decay * d)) - self._1_00
-                    # decelerated noisy direction
                     decelerated_noisy_direction = tf.multiply(deceleration, noisy_action, name="decelerated_noisy_direction")
-                
-                # compute next state
+
                 with tf.name_scope("next_position"):
-                    # next position
                     p = tf.add(state, decelerated_noisy_direction, name="p")
-                    # avoid getting out of map
                     next_state = tf.clip_by_value(p, self._grid_lower_bound, self._grid_upper_bound, name="next_state")
 
         return next_state

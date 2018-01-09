@@ -14,7 +14,7 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 from . import utils
-from .mdp_rnn import MDP_RNN
+from .rnn import StochasticMarkovCell, MarkovRecurrentModel
 
 import numpy as np
 import tensorflow as tf
@@ -49,11 +49,12 @@ class MCPolicyEvaluation(object):
                 self._build_trajectory_ops()
                 self._build_evaluation_ops()
 
-    def _build_trajectory_ops(self):
-        self.__initial_state = utils.initial_state(self.initial_state, self.batch_size)
-        self.__timesteps = utils.timesteps(self.batch_size, self.max_time)
-        self.__rnn = MDP_RNN(self.mdp, self.policy)
-        self.rewards, self.states, self.actions, _ = self.__rnn.unroll(self.__initial_state, self.__timesteps)
+    def _build_trajectory_ops(self):    
+        self._cell = StochasticMarkovCell(self.mdp, self.policy)
+        self._rnn = MarkovRecurrentModel(self._cell)
+        self._initial_state = utils.initial_state(self.initial_state, self.batch_size)
+        self._timesteps = utils.timesteps(self.batch_size, self.max_time)
+        self.rewards, self.states, self.actions = self._rnn.unroll(self._initial_state, self._timesteps)
 
     def _build_evaluation_ops(self):
         discount_schedule = np.geomspace(1, self.gamma ** (self.max_time - 1), self.max_time, dtype=np.float32)

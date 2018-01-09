@@ -14,14 +14,14 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 import tf_mdp.evaluation.utils as utils
-from tf_mdp.evaluation.mdp_rnn import MDP_RNNCell, MDP_RNN
+from tf_mdp.evaluation.rnn import StochasticMarkovCell, MarkovRecurrentModel
 from tf_mdp.models.navigation.navigation import StochasticNavigation
 from tf_mdp.policy.deterministic import DeterministicPolicyNetwork
 
 import tensorflow as tf
 import unittest
 
-class TestMDP_RNN(unittest.TestCase):
+class TestRecurrentModel(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -49,12 +49,14 @@ class TestMDP_RNN(unittest.TestCase):
         cls.policy = DeterministicPolicyNetwork(cls.graph, cls.policy_shape)
 
         # RNN
+        cell = StochasticMarkovCell(cls.mdp, cls.policy)
+        cls.rnn = MarkovRecurrentModel(cell)
         cls.batch_size = 1000
         cls.max_time = 10
-        cls.timesteps = utils.timesteps(cls.batch_size, cls.max_time)
+        with cls.graph.as_default():
+            cls.timesteps = tf.constant(utils.timesteps(cls.batch_size, cls.max_time), name="timesteps")
         cls.initial_state = utils.initial_state(cls.config["initial"], cls.batch_size)
-        cls.rnn = MDP_RNN(cls.mdp, cls.policy)
-        cls.rewards, cls.states, cls.actions, cls.final_state = cls.rnn.unroll(cls.initial_state, cls.timesteps)
+        cls.rewards, cls.states, cls.actions = cls.rnn.unroll(cls.initial_state, cls.timesteps)
 
     def setUp(self):
         with self.graph.as_default():
@@ -93,8 +95,8 @@ class TestMDP_RNN(unittest.TestCase):
 
 
     def test_mdp_rnn_uses_given_graph(self):
-        self.assertTrue(self.rnn.graph is self.graph)
         self.assertTrue(self.rnn.cell.graph is self.graph)
+        self.assertTrue(self.rnn.cell.mdp.graph is self.graph)
 
     def test_mdp_rnn_defines_its_scope(self):
         self.assertTrue(self.graph_has_scope("mdp_rnn"))
@@ -121,12 +123,12 @@ class TestMDP_RNN(unittest.TestCase):
         self.assertEqual(self.rnn.cell.state_size, self.mdp.state_size)
 
     def test_mdp_rnn_cell_augment_state_representation_with_timestep(self):
-        self.sess.run([self.rewards, self.states, self.actions, self.final_state])
-        self.get_and_check_tensor("mdp_rnn/while/policy_cell/state_t:0", (None, 3))
+        self.sess.run([self.rewards, self.states, self.actions])
+        self.get_and_check_tensor("mdp_rnn/while/policy_cell/state_t:0", (self.batch_size, 3))
 
     def test_mdp_rnn_reuse_varibles_in_policy_network(self):
         trainable_variable_scopes = set()
-        trainable_variables = self.rnn.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        trainable_variables = self.rnn.cell.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         for var in trainable_variables:
             trainable_variable_scopes.add('/'.join(var.name.split('/')[:-1]))
         self.assertEqual(len(trainable_variable_scopes), len(self.policy_shape) - 1)
