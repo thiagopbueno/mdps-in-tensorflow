@@ -1,7 +1,7 @@
 {
 	"navigation-small-1-zone": {
 		"module": "navigation.navigation",
-		"class_name": "Navigation",
+		"class_name": "StochasticNavigation",
 		"config": {
 			"initial": [2.0,  5.0],
 			"grid": {

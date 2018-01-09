@@ -19,11 +19,11 @@ import numpy as np
 import tensorflow as tf
 
 
-class StochasticNavigation(MDP):
+class Navigation(MDP):
     """
-    Navigation 2D domain: an agent is supposed to get to a goal position
-    from a start position, subject to noisy directions and deceleration zones,
-    while maximizing its total reward.
+    Navigation 2D domain: base class for the navigation domain,
+    in which an agent is supposed to get to a goal position
+    from a start position.
 
     :param graph: computation graph
     :type graph: tf.Graph
@@ -34,36 +34,59 @@ class StochasticNavigation(MDP):
     def __init__(self, graph, config):
         self.graph = graph
 
+        self.grid = config["grid"]
         self.ndim = config["grid"]["ndim"]
-        self.alpha_min = config["alpha_min"]
-        self.alpha_max = config["alpha_max"]
 
         with self.graph.as_default():
 
             with tf.name_scope("constants/grid"):
                 min_size, max_size = config["grid"]["size"]
-                self.__grid_lower_bound = tf.constant(min_size, dtype=tf.float32, name="grid_lower_bound")
-                self.__grid_upper_bound = tf.constant(max_size, dtype=tf.float32, name="grid_upper_bound")
-                self.__goal = tf.constant(config["grid"]["goal"], dtype=tf.float32, name="goal")
+                self._grid_lower_bound = tf.constant(min_size, dtype=tf.float32, name="grid_lower_bound")
+                self._grid_upper_bound = tf.constant(max_size, dtype=tf.float32, name="grid_upper_bound")
+                self._goal = tf.constant(config["grid"]["goal"], dtype=tf.float32, name="goal")
 
             with tf.name_scope("constants/deceleration"):
                 deceleration = config["grid"]["deceleration"][0]
-                self.__center = tf.constant(deceleration["center"], dtype=tf.float32, name="center")
-                self.__decay  = tf.constant(deceleration["decay"],  dtype=tf.float32, name="decay")
-                self.__1_00 = tf.constant(1.00, dtype=tf.float32)
-                self.__2_00 = tf.constant(2.00, dtype=tf.float32)
-
-            with tf.name_scope("constants/distribution"):
-                self.__scale_min = tf.constant(2 * np.pi / 360 * self.alpha_min, dtype=tf.float32, name="scale_min")
-                self.__scale_max = tf.constant(2 * np.pi / 360 * self.alpha_max, dtype=tf.float32, name="scale_max")
+                self._center = tf.constant(deceleration["center"], dtype=tf.float32, name="center")
+                self._decay  = tf.constant(deceleration["decay"],  dtype=tf.float32, name="decay")
+                self._1_00 = tf.constant(1.00, dtype=tf.float32)
+                self._2_00 = tf.constant(2.00, dtype=tf.float32)
 
     @property
     def action_size(self):
         return self.ndim
-    
+
     @property
     def state_size(self):
         return self.ndim
+
+    def reward(self, state, action):
+        with self.graph.as_default():
+            with tf.name_scope("reward"):
+                # norm L-2 (euclidean distance)
+                r = -tf.sqrt(tf.reduce_sum(tf.square(state - self._goal), axis=1, keep_dims=True), name="r")
+        return r
+
+
+class StochasticNavigation(Navigation):
+    """
+    Navigation 2D domain: an agent is supposed to get to a goal position
+    from a start position, subject to noisy directions and deceleration zones.
+
+    :param graph: computation graph
+    :type graph: tf.Graph
+    :param config: problem-dependent configuration
+    :type config: dict
+    """
+
+    def __init__(self, graph, config):
+        super().__init__(graph, config)
+
+        with self.graph.as_default():
+            with tf.name_scope("constants/distribution"):
+                self.alpha_min, self.alpha_max = config["alpha_min"], config["alpha_max"]
+                self._scale_min = tf.constant(2 * np.pi / 360 * self.alpha_min, dtype=tf.float32, name="scale_min")
+                self._scale_max = tf.constant(2 * np.pi / 360 * self.alpha_max, dtype=tf.float32, name="scale_max")
         
     def transition(self, state, action):
 
@@ -75,7 +98,7 @@ class StochasticNavigation(MDP):
                 with tf.name_scope("deviation"):
                     velocity = tf.norm(action, axis=1, keep_dims=True, name="velocity")
                     max_velocity = tf.sqrt(2.0, name="max_velocity")
-                    scale = tf.maximum(self.__scale_min, self.__scale_max / max_velocity * velocity, name="scale")
+                    scale = tf.maximum(self._scale_min, self._scale_max / max_velocity * velocity, name="scale")
                     loc = tf.constant(0.0, name="loc")
                     noise = tf.distributions.Normal(loc=loc, scale=scale, name="noise")
                     alpha = noise.sample(name="alpha")
@@ -90,9 +113,9 @@ class StochasticNavigation(MDP):
 
                 with tf.name_scope("deceleration"):
                     # distance to center of deceleration zone
-                    d = tf.sqrt(tf.reduce_sum(tf.square(state - self.__center), 1, keep_dims=True), name="d")
+                    d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center), 1, keep_dims=True), name="d")
                     # deceleration_factor
-                    deceleration = self.__2_00 / (self.__1_00 + tf.exp(-self.__decay * d)) - self.__1_00
+                    deceleration = self._2_00 / (self._1_00 + tf.exp(-self._decay * d)) - self._1_00
                     # decelerated noisy direction
                     decelerated_noisy_direction = tf.multiply(deceleration, noisy_action, name="decelerated_noisy_direction")
                 
@@ -101,16 +124,6 @@ class StochasticNavigation(MDP):
                     # next position
                     p = tf.add(state, decelerated_noisy_direction, name="p")
                     # avoid getting out of map
-                    next_state = tf.clip_by_value(p, self.__grid_lower_bound, self.__grid_upper_bound, name="next_state")
+                    next_state = tf.clip_by_value(p, self._grid_lower_bound, self._grid_upper_bound, name="next_state")
 
         return next_state
-
-    def reward(self, state, action):
-
-        with self.graph.as_default():
-
-            with tf.name_scope("reward"):
-                # norm L-2 (euclidean distance)
-                r = -tf.sqrt(tf.reduce_sum(tf.square(state - self.__goal), axis=1, keep_dims=True), name="r")
-
-        return r
