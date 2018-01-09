@@ -13,8 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-from tf_mdp import utils
-from tf_mdp.eval.mdp_rnn import MDP_RNN
+from . import utils
+from .mdp_rnn import MDP_RNN
 
 import numpy as np
 import tensorflow as tf
