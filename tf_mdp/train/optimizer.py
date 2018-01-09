@@ -71,14 +71,14 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
                 totals.append(total)
 
                 # show information
-                if show_progress:
+                if show_progress and epoch_idx % 10 == 0:
                     print('Epoch {0:5}: loss = {1}\r'.format(epoch_idx, loss, total), end='')
 
         end = time.time()
         uptime = end - start
         print("\nDone in {0:.6f} sec.\n".format(uptime))
 
-        return losses, uptime
+        return losses, totals, uptime
 
 
 class SGDPolicyOptimizer(PolicyOptimizer):
