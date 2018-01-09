@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-from tf_mdp.eval.montecarlo import MCPolicyEvaluation
+from tf_mdp.evaluation.montecarlo import MCPolicyEvaluation
 from tf_mdp.models.navigation.navigation import Navigation
 from tf_mdp.policy.deterministic import DeterministicPolicyNetwork
 
@@ -29,17 +29,21 @@ class TestMCPolicyEvaluation(unittest.TestCase):
         cls.graph = tf.Graph()
 
         # MDP model
-        cls.grid = {
-            'ndim': 2,
-            'size': (0.0, 10.0),
-            'start': (2.0,  5.0),
-            'goal': (8.0,  5.0),
-            'deceleration': {
-                'center': (5.0, 5.0),
-                'decay': 2.0
-            }
+        cls.config = {
+            "grid": {
+                "ndim": 2,
+                "size":  [0.0, 10.0],
+                "start": [2.0,  5.0],
+                "goal":  [8.0,  5.0],
+                "deceleration": [{
+                    "center": [5.0, 5.0],
+                    "decay": 2.0
+                }]
+            },
+            "alpha_min": 0.0,
+            "alpha_max": 10.0
         }
-        cls.mdp = Navigation(cls.graph, cls.grid)
+        cls.mdp = Navigation(cls.graph, cls.config)
 
         # Policy Network
         cls.shape = [cls.mdp.state_size + 1, 20, 5, cls.mdp.action_size]
@@ -50,7 +54,7 @@ class TestMCPolicyEvaluation(unittest.TestCase):
         cls.batch_size = 1000
         cls.gamma = 0.9
         cls.mc = MCPolicyEvaluation(cls.mdp, cls.policy,
-                                    initial_state=cls.grid['start'],
+                                    initial_state=cls.config["grid"]['start'],
                                     max_time=cls.max_time,
                                     batch_size=cls.batch_size,
                                     gamma=cls.gamma)

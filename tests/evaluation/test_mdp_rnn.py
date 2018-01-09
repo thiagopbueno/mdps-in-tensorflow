@@ -13,8 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-from tf_mdp import utils
-from tf_mdp.eval.mdp_rnn import MDP_RNNCell, MDP_RNN
+import tf_mdp.evaluation.utils as utils
+from tf_mdp.evaluation.mdp_rnn import MDP_RNNCell, MDP_RNN
 from tf_mdp.models.navigation.navigation import Navigation
 from tf_mdp.policy.deterministic import DeterministicPolicyNetwork
 
@@ -28,17 +28,21 @@ class TestMDP_RNN(unittest.TestCase):
         cls.graph = tf.Graph()
 
         # MDP model
-        cls.grid = {
-            'ndim': 2,
-            'size': (0.0, 10.0),
-            'start': (2.0,  5.0),
-            'goal': (8.0,  5.0),
-            'deceleration': {
-                'center': (5.0, 5.0),
-                'decay': 2.0
-            }
+        cls.config = {
+            "grid": {
+                "ndim": 2,
+                "size":  [0.0, 10.0],
+                "start": [2.0,  5.0],
+                "goal":  [8.0,  5.0],
+                "deceleration": [{
+                    "center": [5.0, 5.0],
+                    "decay": 2.0
+                }]
+            },
+            "alpha_min": 0.0,
+            "alpha_max": 10.0
         }
-        cls.mdp = Navigation(cls.graph, cls.grid)
+        cls.mdp = Navigation(cls.graph, cls.config)
 
         # Policy Network
         cls.policy_shape = [cls.mdp.state_size + 1, 20, 5, cls.mdp.action_size]
@@ -48,7 +52,7 @@ class TestMDP_RNN(unittest.TestCase):
         cls.batch_size = 1000
         cls.max_time = 10
         cls.timesteps = utils.timesteps(cls.batch_size, cls.max_time)
-        cls.initial_state = utils.initial_state(cls.grid['start'], cls.batch_size)
+        cls.initial_state = utils.initial_state(cls.config["grid"]['start'], cls.batch_size)
         cls.rnn = MDP_RNN(cls.mdp, cls.policy)
         cls.rewards, cls.states, cls.actions, cls.final_state = cls.rnn.unroll(cls.initial_state, cls.timesteps)
 

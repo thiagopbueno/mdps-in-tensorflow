@@ -14,7 +14,7 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 from tf_mdp.models.mdp import MDP
-from tf_mdp.models.navigation import navigation
+from tf_mdp.models.navigation.navigation import Navigation
 
 import numpy as np
 import tensorflow as tf
@@ -27,35 +27,39 @@ class TestNavigation(unittest.TestCase):
     def setUpClass(cls):
         cls.graph = tf.Graph()
 
-        cls.grid = {
-            'ndim': 2,
-            'size': (0.0, 10.0),
-            'start': (2.0,  5.0),
-            'goal': (8.0,  5.0),
-            'deceleration': {
-                'center': (5.0, 5.0),
-                'decay': 2.0
-            }
+        cls.config = {
+            "grid": {
+                "ndim": 2,
+                "size":  [0.0, 10.0],
+                "start": [2.0,  5.0],
+                "goal":  [8.0,  5.0],
+                "deceleration": [{
+                    "center": [5.0, 5.0],
+                    "decay": 2.0
+                }]
+            },
+            "alpha_min": 0.0,
+            "alpha_max": 10.0
         }
-        cls.model = navigation.Navigation(cls.graph, cls.grid)
+        cls.mdp = Navigation(cls.graph, cls.config)
 
         with cls.graph.as_default():
             # MDP inputs
             cls.batch_size = 1000
-            cls.min_size, cls.max_size = cls.grid["size"]
-            cls.state  = tf.random_uniform((cls.batch_size, cls.model.state_size),  minval=cls.min_size, maxval=cls.max_size, name="state")
-            cls.action = tf.random_uniform((cls.batch_size, cls.model.action_size), minval=-1.0, maxval=1.0, name="action")
+            cls.min_size, cls.max_size = cls.config["grid"]["size"]
+            cls.state  = tf.random_uniform((cls.batch_size, cls.mdp.state_size),  minval=cls.min_size, maxval=cls.max_size, name="state")
+            cls.action = tf.random_uniform((cls.batch_size, cls.mdp.action_size), minval=-1.0, maxval=1.0, name="action")
 
             # MDP transition
-            cls.next_state = cls.model.transition(cls.state, cls.action)
+            cls.next_state = cls.mdp.transition(cls.state, cls.action)
 
             # MDP reward
-            cls.reward = cls.model.reward(cls.state, cls.action)
+            cls.reward = cls.mdp.reward(cls.state, cls.action)
 
         cls.scopes = cls.get_all_scopes()
 
     def setUp(self):
-        self.sess = tf.Session(graph=self.model.graph)
+        self.sess = tf.Session(graph=self.mdp.graph)
 
     def tearDown(self):
         self.sess.close()
@@ -72,18 +76,18 @@ class TestNavigation(unittest.TestCase):
         return scopes
 
     def get_and_check_tensor(self, name, shape, dtype=tf.float32):
-        tensor = self.model.graph.get_tensor_by_name(name)
+        tensor = self.mdp.graph.get_tensor_by_name(name)
         self.assertEqual(tensor.shape, tf.TensorShape(shape))
         self.assertEqual(tensor.dtype, dtype)
         return tensor
 
 
     def test_model_is_subclass_of_tf_mdp(self):
-        self.assertTrue(issubclass(self.model.__class__, MDP))
-        self.assertTrue(isinstance(self.model, MDP))
+        self.assertTrue(issubclass(self.mdp.__class__, MDP))
+        self.assertTrue(isinstance(self.mdp, MDP))
 
     def test_model_uses_given_graph(self):
-        self.assertTrue(self.model.graph is self.graph)
+        self.assertTrue(self.mdp.graph is self.graph)
 
     def test_model_defines_constants_name_scope(self):
         self.assertTrue("constants/grid" in self.scopes)
@@ -100,10 +104,10 @@ class TestNavigation(unittest.TestCase):
         self.assertTrue("reward" in self.scopes)
 
     def test_model_has_correct_action_size(self):
-        self.assertEqual(self.model.action_size, self.grid["ndim"])
+        self.assertEqual(self.mdp.action_size, self.config["grid"]["ndim"])
 
     def test_model_has_correct_state_size(self):
-        self.assertEqual(self.model.state_size, self.grid["ndim"])
+        self.assertEqual(self.mdp.state_size, self.config["grid"]["ndim"])
 
     def test_transition_computes_next_state_with_same_shape_of_state(self):
         self.assertEqual(self.next_state.shape, self.state.shape)
@@ -112,7 +116,7 @@ class TestNavigation(unittest.TestCase):
         self.assertEqual(self.next_state.dtype, self.state.dtype)
 
     def test_transition_computes_next_state_with_correct_shape(self):
-        self.assertEqual(self.next_state.shape, tf.TensorShape([self.batch_size, self.model.state_size]))
+        self.assertEqual(self.next_state.shape, tf.TensorShape([self.batch_size, self.mdp.state_size]))
 
     def test_reward_has_correct_shape(self):
         self.assertEqual(self.reward.shape, tf.TensorShape([self.batch_size, 1]))
@@ -134,8 +138,8 @@ class TestNavigation(unittest.TestCase):
         scale_max_ = self.get_and_check_tensor("constants/distribution/scale_max:0", ())
         scale_ = self.get_and_check_tensor("transition/deviation/scale:0", [self.batch_size, 1])
         scale_min_, scale_max_, scale_ = self.sess.run([scale_min_, scale_max_, scale_])
-        self.assertAlmostEqual(scale_min_, np.pi / 180 * self.model.alpha_min, places=5)
-        self.assertAlmostEqual(scale_max_, np.pi / 180 * self.model.alpha_max, places=5)
+        self.assertAlmostEqual(scale_min_, np.pi / 180 * self.mdp.alpha_min, places=5)
+        self.assertAlmostEqual(scale_max_, np.pi / 180 * self.mdp.alpha_max, places=5)
         self.assertTrue(np.all(scale_ >= scale_min_))
         self.assertTrue(np.all(scale_ <= scale_max_))
 
@@ -160,8 +164,8 @@ class TestNavigation(unittest.TestCase):
         for i in range(len(alpha_)):
             self.assertAlmostEqual(float(cos_alpha_[i]), float(np.cos(alpha_[i])), places=5)
 
-        action_ = self.get_and_check_tensor("action:0", [self.batch_size, self.grid["ndim"]])
-        noisy_action_ = self.get_and_check_tensor("transition/direction/noisy_action:0", [self.batch_size, self.grid["ndim"]])
+        action_ = self.get_and_check_tensor("action:0", [self.batch_size, self.config["grid"]["ndim"]])
+        noisy_action_ = self.get_and_check_tensor("transition/direction/noisy_action:0", [self.batch_size, self.config["grid"]["ndim"]])
 
         cos_alpha_ = self.get_and_check_tensor("transition/direction/cos_alpha:0", [self.batch_size, 1])
         action_, noisy_action_, cos_alpha_ = self.sess.run([action_, noisy_action_, cos_alpha_])
@@ -173,8 +177,8 @@ class TestNavigation(unittest.TestCase):
     def test_transition_decelerates_action(self):
         d_ = self.get_and_check_tensor("transition/deceleration/d:0", [self.batch_size, 1])
         deceleration_ = self.get_and_check_tensor("transition/deceleration/sub_1:0", [self.batch_size, 1])
-        decelerated_noisy_direction_ = self.get_and_check_tensor("transition/deceleration/decelerated_noisy_direction:0", [self.batch_size, self.grid["ndim"]])
-        noisy_action_ = self.get_and_check_tensor("transition/direction/noisy_action:0", [self.batch_size, self.grid["ndim"]])
+        decelerated_noisy_direction_ = self.get_and_check_tensor("transition/deceleration/decelerated_noisy_direction:0", [self.batch_size, self.config["grid"]["ndim"]])
+        noisy_action_ = self.get_and_check_tensor("transition/direction/noisy_action:0", [self.batch_size, self.config["grid"]["ndim"]])
         d_, deceleration_, decelerated_noisy_direction_, noisy_action_ = self.sess.run([d_, deceleration_, decelerated_noisy_direction_, noisy_action_])
         for i in range(len(noisy_action_)):
             actual_velocity = float(np.linalg.norm(decelerated_noisy_direction_[i]))
@@ -182,10 +186,10 @@ class TestNavigation(unittest.TestCase):
             self.assertAlmostEqual(actual_velocity, expected_velocity, places=5)
 
     def test_transition_computes_next_position_in_grid(self):
-        p_ = self.get_and_check_tensor("transition/next_position/p:0", [self.batch_size, self.grid["ndim"]])
-        state_ = self.get_and_check_tensor("state:0", [self.batch_size, self.grid["ndim"]])
-        next_state_ = self.get_and_check_tensor("transition/next_position/next_state:0", [self.batch_size, self.grid["ndim"]])
-        decelerated_noisy_direction_ = self.get_and_check_tensor("transition/deceleration/decelerated_noisy_direction:0", [self.batch_size, self.grid["ndim"]])
+        p_ = self.get_and_check_tensor("transition/next_position/p:0", [self.batch_size, self.config["grid"]["ndim"]])
+        state_ = self.get_and_check_tensor("state:0", [self.batch_size, self.config["grid"]["ndim"]])
+        next_state_ = self.get_and_check_tensor("transition/next_position/next_state:0", [self.batch_size, self.config["grid"]["ndim"]])
+        decelerated_noisy_direction_ = self.get_and_check_tensor("transition/deceleration/decelerated_noisy_direction:0", [self.batch_size, self.config["grid"]["ndim"]])
         p_, state_, next_state_, decelerated_noisy_direction_ = self.sess.run([p_, state_, next_state_, decelerated_noisy_direction_])
 
         for i in range(len(p_)):
@@ -213,8 +217,8 @@ class TestNavigation(unittest.TestCase):
 
     def test_reward_proportional_to_distance_to_goal_position(self):
         r_ = self.get_and_check_tensor("reward/Neg:0", (self.batch_size, 1))
-        state_ = self.get_and_check_tensor("state:0", [self.batch_size, self.grid["ndim"]])
-        goal = self.grid["goal"]
+        state_ = self.get_and_check_tensor("state:0", [self.batch_size, self.config["grid"]["ndim"]])
+        goal = self.config["grid"]["goal"]
         state_, r_ = self.sess.run([state_, r_])
         for i in range(len(state_)):
             actual_reward = float(r_[i])
