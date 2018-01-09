@@ -28,10 +28,10 @@ class TestNavigation(unittest.TestCase):
         cls.graph = tf.Graph()
 
         cls.config = {
+            "initial": [2.0,  5.0],
             "grid": {
                 "ndim": 2,
                 "size":  [0.0, 10.0],
-                "start": [2.0,  5.0],
                 "goal":  [8.0,  5.0],
                 "deceleration": [{
                     "center": [5.0, 5.0],
@@ -121,19 +121,20 @@ class TestNavigation(unittest.TestCase):
     def test_reward_has_correct_shape(self):
         self.assertEqual(self.reward.shape, tf.TensorShape([self.batch_size, 1]))
 
-    def test_transition_computes_velocity_as_the_norm_of_action_when_sampling_deviations(self):
+
+    def test_navigation_transition_computes_velocity_as_the_norm_of_action_when_sampling_deviations(self):
         velocity_ = self.get_and_check_tensor("transition/deviation/velocity/Sqrt:0", [self.batch_size, 1])
         action, velocity_ = self.sess.run([self.action, velocity_])
         velocity = np.linalg.norm(action, axis=1)
         for i in range(len(velocity)):
             self.assertAlmostEqual(float(velocity_[i]), float(velocity[i]), places=5)
 
-    def test_transition_defines_distribution_location_as_zero_mean_when_sampling_deviations(self):
+    def test_navigation_transition_defines_distribution_location_as_zero_mean_when_sampling_deviations(self):
         loc_ = self.get_and_check_tensor("transition/deviation/loc:0", ())
         loc_ = self.sess.run(loc_)
         self.assertAlmostEqual(loc_, 0.0)
 
-    def test_transition_defines_distribution_scale_range_when_sampling_deviations(self):
+    def test_navigation_transition_defines_distribution_scale_range_when_sampling_deviations(self):
         scale_min_ = self.get_and_check_tensor("constants/distribution/scale_min:0", ())
         scale_max_ = self.get_and_check_tensor("constants/distribution/scale_max:0", ())
         scale_ = self.get_and_check_tensor("transition/deviation/scale:0", [self.batch_size, 1])
@@ -143,7 +144,7 @@ class TestNavigation(unittest.TestCase):
         self.assertTrue(np.all(scale_ >= scale_min_))
         self.assertTrue(np.all(scale_ <= scale_max_))
 
-    def test_transition_computes_distribution_scale_as_linear_function_of_velocity_when_sampling_deviations(self):
+    def test_navigation_transition_computes_distribution_scale_as_linear_function_of_velocity_when_sampling_deviations(self):
         velocity_ = self.get_and_check_tensor("transition/deviation/velocity/Sqrt:0", [self.batch_size, 1])
         scale_ = self.get_and_check_tensor("transition/deviation/scale:0", [self.batch_size, 1])
         scale_min_ = self.get_and_check_tensor("constants/distribution/scale_min:0", ())
@@ -153,10 +154,10 @@ class TestNavigation(unittest.TestCase):
             if scale_[i] > scale_min_:
                 self.assertAlmostEqual(float(scale_[i] / velocity_[i]), float(scale_max_ / np.sqrt(2)), places=5)
 
-    def test_transition_samples_deviation_angle_with_correct_shape_and_type(self):
+    def test_navigation_transition_samples_deviation_angle_with_correct_shape_and_type(self):
         alpha_ = self.get_and_check_tensor("transition/deviation/noise_1/alpha/Reshape:0", [self.batch_size, 1])
 
-    def test_transition_applies_rotation_matrix(self):
+    def test_navigation_transition_applies_rotation_matrix(self):
         alpha_ = self.get_and_check_tensor("transition/deviation/noise_1/alpha/Reshape:0", [self.batch_size, 1])
         cos_alpha_ = self.get_and_check_tensor("transition/direction/cos_alpha:0", [self.batch_size, 1])
 
@@ -174,7 +175,7 @@ class TestNavigation(unittest.TestCase):
             expected_cos = float(cos_alpha_[i])
             self.assertAlmostEqual(actual_cos, expected_cos, places=5)
 
-    def test_transition_decelerates_action(self):
+    def test_navigation_transition_decelerates_action(self):
         d_ = self.get_and_check_tensor("transition/deceleration/d:0", [self.batch_size, 1])
         deceleration_ = self.get_and_check_tensor("transition/deceleration/sub_1:0", [self.batch_size, 1])
         decelerated_noisy_direction_ = self.get_and_check_tensor("transition/deceleration/decelerated_noisy_direction:0", [self.batch_size, self.config["grid"]["ndim"]])
@@ -185,7 +186,7 @@ class TestNavigation(unittest.TestCase):
             expected_velocity = float(deceleration_[i] * np.linalg.norm(noisy_action_[i]))
             self.assertAlmostEqual(actual_velocity, expected_velocity, places=5)
 
-    def test_transition_computes_next_position_in_grid(self):
+    def test_navigation_transition_computes_next_position_in_grid(self):
         p_ = self.get_and_check_tensor("transition/next_position/p:0", [self.batch_size, self.config["grid"]["ndim"]])
         state_ = self.get_and_check_tensor("state:0", [self.batch_size, self.config["grid"]["ndim"]])
         next_state_ = self.get_and_check_tensor("transition/next_position/next_state:0", [self.batch_size, self.config["grid"]["ndim"]])
@@ -215,7 +216,7 @@ class TestNavigation(unittest.TestCase):
             elif actual_next_p_y >= self.max_size:
                 self.assertAlmostEqual(actual_next_state_y, self.max_size)
 
-    def test_reward_proportional_to_distance_to_goal_position(self):
+    def test_navigation_reward_proportional_to_distance_to_goal_position(self):
         r_ = self.get_and_check_tensor("reward/Neg:0", (self.batch_size, 1))
         state_ = self.get_and_check_tensor("state:0", [self.batch_size, self.config["grid"]["ndim"]])
         goal = self.config["grid"]["goal"]

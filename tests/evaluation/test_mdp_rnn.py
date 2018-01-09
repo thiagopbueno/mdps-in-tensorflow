@@ -29,10 +29,10 @@ class TestMDP_RNN(unittest.TestCase):
 
         # MDP model
         cls.config = {
+            "initial": [2.0,  5.0],
             "grid": {
                 "ndim": 2,
                 "size":  [0.0, 10.0],
-                "start": [2.0,  5.0],
                 "goal":  [8.0,  5.0],
                 "deceleration": [{
                     "center": [5.0, 5.0],
@@ -52,7 +52,7 @@ class TestMDP_RNN(unittest.TestCase):
         cls.batch_size = 1000
         cls.max_time = 10
         cls.timesteps = utils.timesteps(cls.batch_size, cls.max_time)
-        cls.initial_state = utils.initial_state(cls.config["grid"]['start'], cls.batch_size)
+        cls.initial_state = utils.initial_state(cls.config["initial"], cls.batch_size)
         cls.rnn = MDP_RNN(cls.mdp, cls.policy)
         cls.rewards, cls.states, cls.actions, cls.final_state = cls.rnn.unroll(cls.initial_state, cls.timesteps)
 

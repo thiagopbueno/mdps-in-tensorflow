@@ -30,10 +30,10 @@ class TestMCPolicyEvaluation(unittest.TestCase):
 
         # MDP model
         cls.config = {
+            "initial": [2.0,  5.0],
             "grid": {
                 "ndim": 2,
                 "size":  [0.0, 10.0],
-                "start": [2.0,  5.0],
                 "goal":  [8.0,  5.0],
                 "deceleration": [{
                     "center": [5.0, 5.0],
@@ -54,7 +54,7 @@ class TestMCPolicyEvaluation(unittest.TestCase):
         cls.batch_size = 1000
         cls.gamma = 0.9
         cls.mc = MCPolicyEvaluation(cls.mdp, cls.policy,
-                                    initial_state=cls.config["grid"]['start'],
+                                    initial_state=cls.config["initial"],
                                     max_time=cls.max_time,
                                     batch_size=cls.batch_size,
                                     gamma=cls.gamma)
