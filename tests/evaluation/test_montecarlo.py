@@ -14,7 +14,7 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 from tf_mdp.evaluation.montecarlo import MCPolicyEvaluation
-from tf_mdp.models.navigation.navigation import Navigation
+from tf_mdp.models.navigation.navigation import StochasticNavigation
 from tf_mdp.policy.deterministic import DeterministicPolicyNetwork
 
 import numpy as np
@@ -43,7 +43,7 @@ class TestMCPolicyEvaluation(unittest.TestCase):
             "alpha_min": 0.0,
             "alpha_max": 10.0
         }
-        cls.mdp = Navigation(cls.graph, cls.config)
+        cls.mdp = StochasticNavigation(cls.graph, cls.config)
 
         # Policy Network
         cls.shape = [cls.mdp.state_size + 1, 20, 5, cls.mdp.action_size]

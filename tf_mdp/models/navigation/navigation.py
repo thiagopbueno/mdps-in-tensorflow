@@ -13,13 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-# from tf_mdp.models.mdp import MDP
 from ..mdp import MDP
 
 import numpy as np
 import tensorflow as tf
 
-class Navigation(MDP):
+
+class StochasticNavigation(MDP):
     """
     Navigation 2D domain: an agent is supposed to get to a goal position
     from a start position, subject to noisy directions and deceleration zones,
@@ -27,12 +27,8 @@ class Navigation(MDP):
 
     :param graph: computation graph
     :type graph: tf.Graph
-    :param grid: spatial parameters of the problem
-    :type grid: dict
-    :param alpha_min: minimum angular deviation in degrees
-    :type alpha_min: float
-    :param alpha_max: maximum angular deviation in degrees
-    :type alpha_max: float
+    :param config: problem-dependent configuration
+    :type config: dict
     """
 
     def __init__(self, graph, config):

@@ -14,14 +14,14 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 from tf_mdp.models.mdp import MDP
-from tf_mdp.models.navigation.navigation import Navigation
+from tf_mdp.models.navigation.navigation import StochasticNavigation
 
 import numpy as np
 import tensorflow as tf
 import unittest
 
 
-class TestNavigation(unittest.TestCase):
+class TestStochasticNavigation(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -41,7 +41,7 @@ class TestNavigation(unittest.TestCase):
             "alpha_min": 0.0,
             "alpha_max": 10.0
         }
-        cls.mdp = Navigation(cls.graph, cls.config)
+        cls.mdp = StochasticNavigation(cls.graph, cls.config)
 
         with cls.graph.as_default():
             # MDP inputs
@@ -109,16 +109,16 @@ class TestNavigation(unittest.TestCase):
     def test_model_has_correct_state_size(self):
         self.assertEqual(self.mdp.state_size, self.config["grid"]["ndim"])
 
-    def test_transition_computes_next_state_with_same_shape_of_state(self):
+    def test_model_transition_computes_next_state_with_same_shape_of_state(self):
         self.assertEqual(self.next_state.shape, self.state.shape)
 
-    def test_transition_computes_next_state_with_same_type_of_state(self):
+    def test_model_transition_computes_next_state_with_same_type_of_state(self):
         self.assertEqual(self.next_state.dtype, self.state.dtype)
 
-    def test_transition_computes_next_state_with_correct_shape(self):
+    def test_model_transition_computes_next_state_with_correct_shape(self):
         self.assertEqual(self.next_state.shape, tf.TensorShape([self.batch_size, self.mdp.state_size]))
 
-    def test_reward_has_correct_shape(self):
+    def test_model_reward_has_correct_shape(self):
         self.assertEqual(self.reward.shape, tf.TensorShape([self.batch_size, 1]))
 
 

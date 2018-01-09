@@ -15,7 +15,7 @@
 
 import tf_mdp.evaluation.utils as utils
 from tf_mdp.evaluation.mdp_rnn import MDP_RNNCell, MDP_RNN
-from tf_mdp.models.navigation.navigation import Navigation
+from tf_mdp.models.navigation.navigation import StochasticNavigation
 from tf_mdp.policy.deterministic import DeterministicPolicyNetwork
 
 import tensorflow as tf
@@ -42,7 +42,7 @@ class TestMDP_RNN(unittest.TestCase):
             "alpha_min": 0.0,
             "alpha_max": 10.0
         }
-        cls.mdp = Navigation(cls.graph, cls.config)
+        cls.mdp = StochasticNavigation(cls.graph, cls.config)
 
         # Policy Network
         cls.policy_shape = [cls.mdp.state_size + 1, 20, 5, cls.mdp.action_size]
