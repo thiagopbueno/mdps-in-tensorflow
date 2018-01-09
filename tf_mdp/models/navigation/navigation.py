@@ -13,7 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-from tf_mdp.models.mdp import MDP
+# from tf_mdp.models.mdp import MDP
+from ..mdp import MDP
 
 import numpy as np
 import tensorflow as tf
@@ -34,23 +35,23 @@ class Navigation(MDP):
     :type alpha_max: float
     """
 
-    def __init__(self, graph, grid, alpha_min=0.0, alpha_max=10.0):
+    def __init__(self, graph, config):
         self.graph = graph
 
-        self.ndim = grid["ndim"]
-        self.alpha_min = alpha_min
-        self.alpha_max = alpha_max
+        self.ndim = config["grid"]["ndim"]
+        self.alpha_min = config["alpha_min"]
+        self.alpha_max = config["alpha_max"]
 
         with self.graph.as_default():
 
             with tf.name_scope("constants/grid"):
-                min_size, max_size = grid["size"]
+                min_size, max_size = config["grid"]["size"]
                 self.__grid_lower_bound = tf.constant(min_size, dtype=tf.float32, name="grid_lower_bound")
                 self.__grid_upper_bound = tf.constant(max_size, dtype=tf.float32, name="grid_upper_bound")
-                self.__goal = tf.constant(grid["goal"], dtype=tf.float32, name="goal")
+                self.__goal = tf.constant(config["grid"]["goal"], dtype=tf.float32, name="goal")
 
             with tf.name_scope("constants/deceleration"):
-                deceleration = grid["deceleration"]
+                deceleration = config["grid"]["deceleration"][0]
                 self.__center = tf.constant(deceleration["center"], dtype=tf.float32, name="center")
                 self.__decay  = tf.constant(deceleration["decay"],  dtype=tf.float32, name="decay")
                 self.__1_00 = tf.constant(1.00, dtype=tf.float32)
