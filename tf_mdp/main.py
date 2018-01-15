@@ -18,11 +18,11 @@ from policy.deterministic import DeterministicPolicyNetwork
 from train.optimizer import ActionOptimizer, SGDPolicyOptimizer
 from evaluation.rnn import DeterministicMarkovCell, MarkovRecurrentModel
 from evaluation.montecarlo import MCPolicyEvaluation
+from planning import detplan, stplan
 from utils.plot import plot_losses
 
 import argparse
 import matplotlib.pyplot as plt
-import numpy as np
 import tensorflow as tf
 
 
@@ -50,67 +50,12 @@ def show_info(args):
     print()
 
 
-def run_deterministic_model(model, timesteps, batch_size, discount, epochs, learning_rate):
+def load_model(model_id):
     graph = tf.Graph()
-
-    # MDP
-    model, config = models.make(model)
+    model, config = models.make(model_id)
     mdp = model(graph, config)
-
-    # Action variables
-    with graph.as_default():
-        actions = tf.Variable(
-            tf.truncated_normal(shape=[batch_size, timesteps, mdp.state_size], stddev=0.05),
-            name="actions")
-
-    # Trajectory evaluation
-    cell = DeterministicMarkovCell(mdp)
-    rnn = MarkovRecurrentModel(cell)
-    initial_state = np.repeat([config["initial"]], batch_size, axis=0).astype(np.float32)
-    rewards, states, _ = rnn.unroll(initial_state, actions)
-    
-    # loss
-    with graph.as_default():
-        total = tf.reduce_sum(rewards, axis=1, name="total")
-        loss = tf.reduce_mean(tf.square(total), name="loss") # Mean-Squared Error (MSE)
-
-    # ActionOptimizer
-    metrics = {
-        "loss":  loss,
-        "total": total,
-        "states":  states,
-        "actions": rnn.inputs,
-        "rewards": rewards
-    }
-    optimizer = ActionOptimizer(graph, metrics, learning_rate, config["limits"])
-    return optimizer.minimize(epochs)
-
-
-def run_stochastic_model(model, timesteps, batch_size, discount, epochs, learning_rate):
-    graph = tf.Graph()
-
-    # MDP
-    model, config = models.make(model)
-    mdp = model(graph, config)
-
-    # PolicyNetwork
-    shape = [mdp.state_size + 1, 20, 5, mdp.action_size]
-    policy = DeterministicPolicyNetwork(graph, shape)
-
-    # PolicyEvaluation
-    mc = MCPolicyEvaluation(mdp, policy,
-                                initial_state=config["initial"],
-                                max_time=timesteps,
-                                batch_size=batch_size,
-                                gamma=discount)
-
-    # PolicyOptimizer
-    metrics = {
-        "loss":  mc.expected_return,
-        "total": mc.total
-    }
-    optimizer = SGDPolicyOptimizer(graph, metrics, learning_rate)
-    return optimizer.minimize(epochs)
+    start = config["initial"]
+    return mdp, start, config
 
 
 def report_results(losses):
@@ -121,21 +66,19 @@ if __name__ == '__main__':
     args = parse_args()
     show_info(args)
 
+    # MDP
+    mdp, start, config = load_model(args.model)
+
+    # Planner
     if args.mode == "stochastic":
-        losses, totals, uptime = run_stochastic_model(
-                                    args.model,
-                                    args.timesteps,
-                                    args.batch_size,
-                                    args.discount,
-                                    args.epochs,
-                                    args.learning_rate)
+        losses, totals, uptime = stplan.run(
+                                    mdp, start,
+                                    args.timesteps, args.batch_size,
+                                    args.discount, args.epochs, args.learning_rate)
     elif args.mode == "deterministic":
-        losses, best_batch, uptime = run_deterministic_model(
-                                    args.model,
-                                    args.timesteps,
-                                    args.batch_size,
-                                    args.discount,
-                                    args.epochs,
-                                    args.learning_rate)
+        losses, best_batch, uptime = detplan.run(
+                                    mdp, start, config["limits"],
+                                    args.timesteps, args.batch_size,
+                                    args.discount, args.epochs, args.learning_rate)
 
     report_results(losses)
