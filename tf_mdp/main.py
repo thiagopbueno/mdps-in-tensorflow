@@ -58,6 +58,19 @@ def load_model(model_id):
     return mdp, start, config
 
 
+def run_stochastic_planner(mdp, start, args):
+    return stplan.run(
+                    mdp, start,
+                    args.timesteps, args.batch_size,
+                    args.discount, args.epochs, args.learning_rate)
+
+def run_deterministic_planner(mdp, start, args, config):
+    return detplan.run(
+                    mdp, start, config["limits"],
+                    args.timesteps, args.batch_size,
+                    args.discount, args.epochs, args.learning_rate)
+
+
 def report_results(losses):
     plot_losses(losses)
 
@@ -71,14 +84,8 @@ if __name__ == '__main__':
 
     # Planner
     if args.mode == "stochastic":
-        losses, totals, uptime = stplan.run(
-                                    mdp, start,
-                                    args.timesteps, args.batch_size,
-                                    args.discount, args.epochs, args.learning_rate)
+        losses, _, _ = run_stochastic_planner(mdp, start, args)
     elif args.mode == "deterministic":
-        losses, best_batch, uptime = detplan.run(
-                                    mdp, start, config["limits"],
-                                    args.timesteps, args.batch_size,
-                                    args.discount, args.epochs, args.learning_rate)
+        losses, _, _ = run_deterministic_planner(mdp, start, args, config)
 
     report_results(losses)

@@ -177,7 +177,7 @@ class ActionOptimizer(object):
                 # store and show loss information
                 loss = sess.run(self.loss)
                 losses.append(loss)
-                if show_progress:
+                if show_progress and epoch_idx % 10 == 0:
                     print('Epoch {0:5}: loss = {1}\r'.format(epoch_idx, loss), end='')
 
             # index of best solution among all planners
