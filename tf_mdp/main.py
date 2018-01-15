@@ -14,10 +14,6 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 import models
-from policy.deterministic import DeterministicPolicyNetwork
-from train.optimizer import ActionOptimizer, SGDPolicyOptimizer
-from evaluation.rnn import DeterministicMarkovCell, MarkovRecurrentModel
-from evaluation.montecarlo import MCPolicyEvaluation
 from planning import detplan, stplan
 from utils.plot import plot_losses
 
