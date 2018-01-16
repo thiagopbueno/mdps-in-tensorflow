@@ -226,3 +226,8 @@ class ReservoirLinear(Reservoir):
     def evaporation(self, state):
         loc_e_t = 0.1 * state
         return loc_e_t
+
+# new_state = tf.clip_by_value(new_state,
+#                              clip_value_min=0.0,
+#                              clip_value_max=self.max_cap,
+#                              name="next_state")
