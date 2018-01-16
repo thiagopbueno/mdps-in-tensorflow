@@ -19,6 +19,7 @@ import numpy as np
 import tensorflow as tf
 import tf_mdp.models.mdp as mdp
 
+
 class Reservoir(mdp.TF_MDP, metaclass=abc.ABCMeta):
     """
     Reservoir Control: the agent control multiple connected
@@ -58,6 +59,14 @@ class Reservoir(mdp.TF_MDP, metaclass=abc.ABCMeta):
                 self.adjacency_matrix = tf.constant(system['adjacency_matrix'],
                                                     dtype="float32",
                                                     name="adjacency_matrix")
+            with tf.name_scope("constants/"):
+                self._r_param = tf.constant(system['reward_param'],
+                                            dtype=tf.float32)
+                self._above_pen = tf.constant(system['above_penalty'],
+                                              dtype=tf.float32)
+                self._below_pen = tf.constant(system['below_penalty'],
+                                              dtype=tf.float32)
+                self._0_00 = tf.constant(0.0, dtype=tf.float32)
 
     @property
     def action_size(self):
@@ -122,16 +131,17 @@ class Reservoir(mdp.TF_MDP, metaclass=abc.ABCMeta):
                                               axes=1,
                                               name="downstream")
 
-                    downstream = tf.reshape(downstream, state_shape, name="downstream_final")
+                    downstream = tf.reshape(downstream,
+                                            state_shape,
+                                            name="downstream_final")
 
                     # next position
                     new_state = state + r_t - e_t - action + downstream
 
                     # avoid getting negative values
-                    new_state = tf.clip_by_value(new_state,
-                                                 clip_value_min=0.0,
-                                                 clip_value_max=self.max_cap,
-                                                 name="next_state")
+                    new_state = tf.maximum(new_state,
+                                           self._0_00,
+                                           name="next_state")
 
         return new_state
 
@@ -155,31 +165,20 @@ class Reservoir(mdp.TF_MDP, metaclass=abc.ABCMeta):
         with self.graph.as_default():
 
             with tf.name_scope("reward"):
-
-                # calculating the safe range
-                __zeros = tf.zeros(state.get_shape(),
-                                   dtype=tf.float32,
-                                   name="zeros")
-                lower_comparison = tf.greater_equal(state,
-                                                    self.lower,
-                                                    name="leq_than_expected")
-                upper_comparison = tf.greater_equal(self.upper,
-                                                    state,
-                                                    name="geq_than_expected")
-                in_bounds = tf.logical_and(lower_comparison,
-                                           upper_comparison,
-                                           name="in_bounds")
                 below_bounds = tf.less(state,
                                        self.lower,
-                                       name="l_than_expected")
-                rewards = tf.where(in_bounds,
-                                   __zeros,
-                                   tf.where(below_bounds,
-                                            - 5 * (self.lower - state),
-                                            - 100 * (state - self.upper)),
-                                   name="rewards_safe_range")
-
-                rewards += tf.abs(self.halfs - state) * (- 0.1)
+                                       name="b_than_expected")
+                above_bounds = tf.less(self.upper,
+                                       state,
+                                       name="a_than_expected")
+                below_bounds = tf.cast(below_bounds, tf.float32)
+                above_bounds = tf.cast(above_bounds, tf.float32)
+                c_bel = (self._below_pen * (self.lower - state)) * below_bounds
+                c_abo = (self._above_pen * (state - self.upper)) * above_bounds
+                c = tf.add(c_bel,
+                           c_abo,
+                           name="rewards_safe_range")
+                rewards = c + tf.abs(self.halfs - state) * (- self._r_param)
                 rewards = tf.reduce_sum(rewards,
                                         1,
                                         keep_dims=True,
@@ -224,3 +223,8 @@ class ReservoirLinear(Reservoir):
     def evaporation(self, state):
         loc_e_t = 0.1 * state
         return loc_e_t
+
+# new_state = tf.clip_by_value(new_state,
+#                              clip_value_min=0.0,
+#                              clip_value_max=self.max_cap,
+#                              name="next_state")

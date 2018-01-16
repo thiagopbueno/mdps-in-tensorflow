@@ -32,7 +32,10 @@ class ReservoirTest(unittest.TestCase):
                            'initial_states': [105.0, 105.0, 105.0],
                            'adjacency_matrix': [[0, 1, 0],
                                                 [0, 0, 1],
-                                                [0, 0, 0]]}
+                                                [0, 0, 0]],
+                            'reward_param': 0.1,
+                            'above_penalty': - 100,
+                            'below_penalty': - 5}
         cls.env_dict = {'rain_mean': 5.0,
                         'rain_std': 1.,
                         'evaporation_std': 5.}
@@ -103,7 +106,6 @@ class ReservoirTest(unittest.TestCase):
         self.assertIn("transition/random_variables/rain_noise", self.scopes)
         self.assertIn("transition/random_variables/eva_noise", self.scopes)
         self.assertIn("transition/next_position/downstream", self.scopes)
-        self.assertIn("transition/next_position/next_state", self.scopes)
         self.assertIn("reward/final_reward", self.scopes)
 
     def test_model_has_correct_action_size(self):
