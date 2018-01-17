@@ -33,9 +33,9 @@ class ReservoirTest(unittest.TestCase):
                            'adjacency_matrix': [[0, 1, 0],
                                                 [0, 0, 1],
                                                 [0, 0, 0]],
-                            'reward_param': 0.1,
-                            'above_penalty': - 100,
-                            'below_penalty': - 5}
+                           'reward_param': 0.1,
+                           'above_penalty': - 100,
+                           'below_penalty': - 5}
         cls.env_dict = {'rain_mean': 5.0,
                         'rain_std': 1.,
                         'evaporation_std': 5.}
@@ -104,7 +104,11 @@ class ReservoirTest(unittest.TestCase):
 
     def test_model_defines_name_scope(self):
         self.assertIn("transition/random_variables/rain_noise", self.scopes)
+        self.assertIn("transition/random_variables/rain_noise_1/r_t",
+                      self.scopes)
         self.assertIn("transition/random_variables/eva_noise", self.scopes)
+        self.assertIn("transition/random_variables/eva_noise_1/e_t",
+                      self.scopes)
         self.assertIn("transition/next_position/downstream", self.scopes)
         self.assertIn("reward/final_reward", self.scopes)
 
@@ -169,6 +173,38 @@ class ReservoirTest(unittest.TestCase):
         self.assertTrue(test_ajacency)
         self.assertTrue(test_downstream)
 
+    def test_deterministic_transition(self):
+        zeros = np.zeros(self.s_a_shape)
+        e_t_name = "transition/random_variables/eva_noise_1/e_t/Reshape:0"
+        r_t_name = "transition/random_variables/rain_noise_1/r_t/Reshape:0"
+        tf_e_t = self.get_and_check_tensor(self.graph,
+                                           e_t_name,
+                                           self.s_a_shape)
+        tf_r_t = self.get_and_check_tensor(self.graph,
+                                           r_t_name,
+                                           self.s_a_shape)
+        feed_dict = {tf_r_t: zeros, tf_e_t: zeros}
+        tensor_list = [self.state, self.action, self.next_state]
+        state, action, new_state = self.sess.run(tensor_list,
+                                                 feed_dict=feed_dict)
+        all_water_in_state = np.sum(state, axis=1)
+        condbelow = all_water_in_state <= sum(self.system_dict['upper_bounds'])
+        condabove = all_water_in_state >= sum(self.system_dict['lower_bounds'])
+        basic_condition = np.all(condbelow) and np.all(condabove)
+        all_water_in_new_state = np.sum(new_state, axis=1)
+        dumped_water = all_water_in_state - all_water_in_new_state
+        action_of_the_last_reservoir = action[:, 2]
+        tolerance = 1e-04
+        main_comparison = np.all(np.isclose(dumped_water,
+                                            action_of_the_last_reservoir,
+                                            atol=tolerance))
+        basic_condition_msg = "initial_states are not between bounds"
+        main_comparison_msg = """the difference between
+        action_of_the_last_reservoir and dumped_water are bigger
+        than the difference expected with tolerance {}""".format(tolerance)
+        self.assertTrue(basic_condition, msg=basic_condition_msg)
+        self.assertTrue(main_comparison, msg=main_comparison_msg)
+
     def test_safe_range_is_respected(self):
         rewards_range_name = "reward/rewards_safe_range:0"
         states_in_range = np.full(self.s_a_shape, 105.0)
@@ -208,3 +244,20 @@ class ReservoirTest(unittest.TestCase):
                                0.00,
                                places=2,
                                msg="result = {}".format(result))
+
+    def test_evaporation_and_rain_are_positiv(self):
+        e_t_name = "transition/random_variables/e_t_protected:0"
+        r_t_name = "transition/random_variables/r_t_protected:0"
+        tf_e_t = self.get_and_check_tensor(self.graph,
+                                           e_t_name,
+                                           self.s_a_shape)
+        tf_r_t = self.get_and_check_tensor(self.graph,
+                                           r_t_name,
+                                           self.s_a_shape)
+        evaporation, rain = self.sess.run([tf_e_t, tf_r_t])
+        condition_evaporation = np.all(evaporation >= 0)
+        condition_rain = np.all(rain >= 0)
+        condition_evaporation_msg = "some negative values in evaporation"
+        condition_rain_msg = "some negative values in rain"
+        self.assertTrue(condition_evaporation, condition_evaporation_msg)
+        self.assertTrue(condition_rain, condition_rain_msg)
