@@ -49,6 +49,21 @@
 			    }]
 			}
 		}
+	},
+	"noisy-navigation-small": {
+		"module": "navigation.navigation",
+		"class_name": "NoisyNavigation",
+		"config": {
+			"initial": [1.0,  1.0],
+			"grid": {
+			    "ndim": 2,
+			    "size":  [0.0, 10.0],
+			    "goal":  [1.0,  9.0],
+			    "deceleration": [{
+			        "center": [5.0, 5.0],
+			        "decay": 10.0
+			    }]
+			}
+		}
 	}
-
 }
