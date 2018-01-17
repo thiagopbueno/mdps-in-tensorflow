@@ -126,7 +126,7 @@ class TestRecurrentModel(unittest.TestCase):
         self.sess.run([self.rewards, self.states, self.actions])
         self.get_and_check_tensor("mdp_rnn/while/policy_cell/state_t:0", (self.batch_size, 3))
 
-    def test_mdp_rnn_reuse_varibles_in_policy_network(self):
+    def test_mdp_rnn_reuse_variables_in_policy_network(self):
         trainable_variable_scopes = set()
         trainable_variables = self.rnn.cell.graph.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
         for var in trainable_variables:

@@ -51,7 +51,7 @@ class TestStochasticNavigation(unittest.TestCase):
             cls.action = tf.random_uniform((cls.batch_size, cls.mdp.action_size), minval=-1.0, maxval=1.0, name="action")
 
             # MDP transition
-            cls.next_state = cls.mdp.transition(cls.state, cls.action)
+            cls.next_state, _ = cls.mdp.transition(cls.state, cls.action)
 
             # MDP reward
             cls.reward = cls.mdp.reward(cls.state, cls.action)

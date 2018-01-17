@@ -149,4 +149,38 @@ class StochasticNavigation(Navigation):
                     p = tf.add(state, decelerated_noisy_direction, name="p")
                     next_state = tf.clip_by_value(p, self._grid_lower_bound, self._grid_upper_bound, name="next_state")
 
-        return next_state
+        return next_state, None
+
+
+class NoisyNavigation(Navigation):
+
+    def __init__(self, graph, config):
+        super().__init__(graph, config)
+
+        with self.graph.as_default():
+            with tf.name_scope("constants/distribution"):
+                self._scale_max = tf.constant(0.1, dtype=tf.float32, name="scale_max")
+                self._max_velocity = tf.sqrt(2.0, name="max_velocity")
+
+    def transition(self, state, action):
+
+        with self.graph.as_default():
+
+            with tf.name_scope("transition/deceleration"):
+                d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center), 1, keep_dims=True), name="d")
+                deceleration = self._2_00 / (self._1_00 + tf.exp(-self._decay * d)) - self._1_00
+                decelerated_action = tf.multiply(deceleration, action, name="decelerated_action")
+
+            with tf.name_scope("transition/next_position"):
+                p = tf.add(state, decelerated_action, name="p")
+                velocity = tf.norm(action, axis=1, keep_dims=True, name="velocity")
+                scale = tf.multiply(self._scale_max / self._max_velocity, velocity, name="scale")
+                next_state_dist = tf.distributions.Normal(loc=p, scale=scale, name="next_state_dist")
+                next_state_sampled = next_state_dist.sample(name="next_state_sampled")
+                next_state = tf.clip_by_value(
+                                next_state_sampled,
+                                self._grid_lower_bound, self._grid_upper_bound,
+                                name="next_state")
+                next_state_log_prob = next_state_dist.log_prob(next_state_sampled, name="next_state_log_prob")
+
+        return next_state, next_state_log_prob
