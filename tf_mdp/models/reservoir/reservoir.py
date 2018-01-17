@@ -20,7 +20,7 @@ import tensorflow as tf
 import tf_mdp.models.mdp as mdp
 
 
-class Reservoir(mdp.TF_MDP, metaclass=abc.ABCMeta):
+class Reservoir(mdp.TF_MDP, metaclass=abc.ABCMeta): # noqa
     """
     Reservoir Control: the agent control multiple connected
     reservoirs. Each state is a sequence of water levels in each
@@ -123,6 +123,10 @@ class Reservoir(mdp.TF_MDP, metaclass=abc.ABCMeta):
                     r_t = rain_noise.sample(state_shape, name="r_t")
                     e_t = eva_noise.sample(name="e_t")
 
+                    # to prevent negative values for rain and evaporation
+                    r_t = tf.maximum(r_t, self._0_00, name="r_t_protected")
+                    e_t = tf.maximum(e_t, self._0_00, name="e_t_protected")
+
                 # compute next state
                 with tf.name_scope("next_position"):
                     # calculate the quantity flowing downstream
@@ -223,8 +227,3 @@ class ReservoirLinear(Reservoir):
     def evaporation(self, state):
         loc_e_t = 0.1 * state
         return loc_e_t
-
-# new_state = tf.clip_by_value(new_state,
-#                              clip_value_min=0.0,
-#                              clip_value_max=self.max_cap,
-#                              name="next_state")
