@@ -47,10 +47,7 @@ class PolicyGradientOptimizer():
         self.loss = tf.reduce_mean(self.total, axis=0, name="loss")
 
     def _compute_gradients(self):
-        Q = tf.cumsum(self.trajectory.rewards, exclusive=True, reverse=True, name="Q")
-        baseline = tf.reduce_mean(Q, axis=1, name="baseline")
-        print(Q)
-        print(baseline)
+        Q = tf.stop_gradient(tf.cumsum(self.trajectory.rewards, exclusive=True, reverse=True))
 
         self.grads_rewards = defaultdict(list)
         self.grads_future_rewards = defaultdict(list)
@@ -72,8 +69,8 @@ class PolicyGradientOptimizer():
                 grads_reward = tf.gradients(ys=average_reward, xs=params, stop_gradients=[state, next_state], name="grads_reward")
 
                 log_prob = tf.reduce_sum(log_prob, axis=1)
-                average_log_prob_future_reward = tf.reduce_mean(log_prob * (Q[t] - baseline[t]), name="average_log_prob_future_reward")
-                grads_future_reward = tf.gradients(ys=average_log_prob_future_reward, xs=params, stop_gradients=[state, next_state, Q], name="grads_future_reward")
+                average_log_prob_future_reward = tf.reduce_mean(log_prob * Q[t], name="average_log_prob_future_reward")
+                grads_future_reward = tf.gradients(ys=average_log_prob_future_reward, xs=params, stop_gradients=[state, next_state], name="grads_future_reward")
 
                 discount *= self.gamma
 
