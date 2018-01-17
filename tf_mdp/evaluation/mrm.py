@@ -42,7 +42,7 @@ class MarkovRecurrentModel(object):
                     next_state, log_prob = self.mdp.transition(state, action)
 
                 with tf.name_scope("reward_cell"):
-                    reward = self.mdp.reward(next_state, action)
+                    reward = self.mdp.reward(state, action)
 
         return action, reward, next_state, log_prob
 
