@@ -2,6 +2,9 @@
 
 Representation and solution of continuous state-action MDPs in TensorFlow.
 
+[![Build Status](https://travis-ci.org/thiagopbueno/tf-mdp.svg?branch=master)](https://travis-ci.org/thiagopbueno/tf-mdp)
+[![License](https://img.shields.io/aur/license/yaourt.svg)](https://github.com/thiagopbueno/tf-mdp/blob/master/LICENSE)
+
 ## Usage
 
 ```shell
