@@ -31,6 +31,13 @@ class PolicyNetwork(metaclass=abc.ABCMeta):
         self.shape = shape
         self.layers = []
 
+    @property
+    def params(self):
+        params = []
+        for layer in self.layers:
+            params += layer.variables
+        return params
+
     def count_params(self):
         """
         Returns the total number of network parameters.

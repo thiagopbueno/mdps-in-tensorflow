@@ -36,7 +36,34 @@ class DeterministicPolicyNetwork(PolicyNetwork):
     def __init__(self, graph, shape, bounds=1.0):
         super().__init__(graph, shape)
         self.bounds = bounds
-    
+
+        with self.graph.as_default():
+            self._build_network_layers()
+
+            with tf.name_scope("policy/constants/"):
+                # output limits
+                self.action_bounds = tf.constant(self.bounds, name="bounds")
+
+    def _build_network_layers(self):
+        # with tf.variable_scope("policy", reuse=tf.AUTO_REUSE):
+
+        # hidden layers
+        for i, n_h in enumerate(self.shape[1:-1]):
+            layer = tf.layers.Dense(
+                    units=n_h,
+                    activation=tf.nn.relu,
+                    kernel_initializer=tf.glorot_normal_initializer(),
+                    name="layer" + str(i + 1))
+            self.layers.append(layer)
+
+        # output layer
+        layer = tf.layers.Dense(
+                units=self.shape[-1],
+                activation=tf.nn.tanh,
+                kernel_initializer=tf.glorot_normal_initializer(),
+                name="layer" + str(len(self.shape) - 1))
+        self.layers.append(layer)
+
     def __call__(self, state):
         """
         Return the prescribed action by the parametric policy for the given state.
@@ -45,33 +72,19 @@ class DeterministicPolicyNetwork(PolicyNetwork):
         :type state: tf.Tensor(shape=(batch_size, state_size))
         :rtype: tf.Tensor(shape=(batch_size, action_size))
         """
-        with self.graph.as_default():
-            with tf.variable_scope('policy'):
 
-                # input layer
+        with self.graph.as_default():
+
+            with tf.variable_scope("policy", reuse=tf.AUTO_REUSE):
+
+                # input
                 h = state
 
                 # hidden layers
-                for i, n_h in enumerate(self.shape[1:-1]):
-                    layer = tf.layers.Dense(
-                            units=n_h,
-                            activation=tf.nn.relu,
-                            kernel_initializer=tf.glorot_normal_initializer(),
-                            name="layer" + str(i + 1))
-                    self.layers.append(layer)
+                for layer in self.layers:
                     h = layer(h)
 
-                # output layer
-                layer = tf.layers.Dense(
-                        units=self.shape[-1],
-                        activation=tf.nn.tanh,
-                        kernel_initializer=tf.glorot_normal_initializer(),
-                        name="layer" + str(len(self.shape) - 1))
-                self.layers.append(layer)
-                h = layer(h)
-
-                # add action bounds over last tanh layer
-                bounds = tf.constant(self.bounds, name="bounds")
-                action = tf.multiply(bounds, h, name="action")
+                # output
+                action = tf.multiply(self.action_bounds, h, name="action")
 
         return action

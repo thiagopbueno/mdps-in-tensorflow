@@ -98,7 +98,7 @@ class TestDeterministicPolicyNetwork(unittest.TestCase):
         self.assertTrue(self.action is self.get_and_check_tensor("policy/action:0", (self.batch_size, self.policy_shape[-1])))
 
         last_layer = self.policy.graph.get_tensor_by_name("policy/layer{}/Tanh:0".format(len(self.policy_shape) - 1))
-        bounds = self.get_and_check_tensor("policy/bounds:0", ())
+        bounds = self.get_and_check_tensor("policy/constants/bounds:0", ())
         self.assertTrue(set(self.action.op.inputs), set([last_layer, bounds]))
 
         action_ = self.sess.run(self.action)
