@@ -16,8 +16,98 @@
 import abc
 import time
 
+from collections import defaultdict
+
 import numpy as np
 import tensorflow as tf
+
+
+class PolicyGradientOptimizer():
+
+    def __init__(self, graph, policy, trajectory, learning_rate, gamma):
+        self.graph = graph
+        self.policy = policy
+        self.trajectory = trajectory
+        self.learning_rate = learning_rate
+        self.gamma = gamma
+
+        with self.graph.as_default():
+            self.max_time = len(self.trajectory.states)
+            self.batch_size = self.trajectory.states[0].shape[0].value
+            self._compute_loss()
+            self._compute_gradients()
+            self._apply_gradients()
+
+    def _compute_loss(self):
+        discount_schedule = np.geomspace(1, self.gamma ** (self.max_time - 1), self.max_time, dtype=np.float32)
+        discount_schedule = np.repeat([discount_schedule], self.batch_size, axis=0)
+        discount_schedule = np.reshape(discount_schedule, (self.batch_size, self.max_time, 1))
+        self.discount_schedule = tf.constant(discount_schedule, dtype=tf.float32, name="discount_schedule")
+        self.total = tf.reduce_sum(tf.stack(self.trajectory.rewards, axis=1) * self.discount_schedule, axis=1, name="total_discount_reward")
+        self.loss = tf.reduce_mean(self.total, axis=0, name="loss")
+
+    def _compute_gradients(self):
+        Q = tf.stop_gradient(tf.cumsum(self.trajectory.rewards, exclusive=True, reverse=True))
+
+        self.grads_rewards = defaultdict(list)
+        self.grads_future_rewards = defaultdict(list)
+        self.grads_and_vars = []
+
+        params = self.policy.params
+
+        discount = 1.0
+        for t in range(self.max_time):
+
+            with tf.name_scope("t{}/".format(t)):
+
+                state = self.trajectory.states[t]
+                reward = self.trajectory.rewards[t]
+                next_state = self.trajectory.next_states[t]
+                log_prob = self.trajectory.log_probs[t]
+
+                average_reward = tf.multiply(discount, tf.reduce_mean(reward), name="average_reward")
+                grads_reward = tf.gradients(ys=average_reward, xs=params, stop_gradients=[state, next_state], name="grads_reward")
+
+                log_prob = tf.reduce_sum(log_prob, axis=1)
+                average_log_prob_future_reward = tf.reduce_mean(log_prob * Q[t], name="average_log_prob_future_reward")
+                grads_future_reward = tf.gradients(ys=average_log_prob_future_reward, xs=params, stop_gradients=[state, next_state], name="grads_future_reward")
+
+                discount *= self.gamma
+
+                for j, param in enumerate(params):
+                    if grads_reward[j] is not None:
+                        self.grads_rewards[param].append(grads_reward[j])
+                    self.grads_future_rewards[param].append(grads_future_reward[j])
+
+        with tf.name_scope("grads"):
+            for j, param in enumerate(params):
+                grad_1 = self.grads_rewards[param]
+                grad_2 = self.grads_future_rewards[param]
+                grad = tf.reduce_sum(tf.stack(grad_1 + grad_2), axis=0, name="grad")
+                self.grads_and_vars.append((grad, param))
+                assert(grad.shape == param.shape)
+
+    def _apply_gradients(self):
+        with tf.name_scope("update"):
+            updates = []
+            for grad, var in self.grads_and_vars:
+                updates.append(var.assign(var + self.learning_rate * grad))
+            self.train_op = tf.group(*updates, name="train_op")
+
+    def minimize(self, epochs, show_progress=True):
+        losses = []
+        start = time.time()
+        with tf.Session(graph=self.graph) as sess:
+            sess.run(tf.global_variables_initializer())
+            for step in range(epochs):
+                loss, _ = sess.run([self.loss, self.train_op])
+                losses.append(loss[0])
+                if show_progress and step % 10 == 0:
+                    print('Epoch {0:5}: loss = {1:.6f}\r'.format(step, loss[0]), end='')
+        end = time.time()
+        uptime = end - start
+        print("\nDone in {0:.6f} sec.\n".format(uptime))
+        return losses, uptime
 
 
 class PolicyOptimizer(metaclass=abc.ABCMeta):
@@ -68,12 +158,12 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
                 _, loss, total = sess.run([self.train_step, self.loss, self.total])
 
                 # store results
-                losses.append(loss)
+                losses.append(loss[0])
                 totals.append(total)
 
                 # show information
                 if show_progress and epoch_idx % 10 == 0:
-                    print('Epoch {0:5}: loss = {1}\r'.format(epoch_idx, loss, total), end='')
+                    print('Epoch {0:5}: loss = {1:.6f}\r'.format(epoch_idx, loss[0]), end='')
 
         end = time.time()
         uptime = end - start
@@ -101,7 +191,7 @@ class SGDPolicyOptimizer(PolicyOptimizer):
         learning_rate = self.hyperparameters["learning_rate"]
         with tf.name_scope("SGDPolicyOptimizer"):
             self._optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-            self.train_step = self._optimizer.minimize(self.loss)
+            self.train_step = self._optimizer.minimize(-self.loss)
 
     @property
     def learning_rate(self):

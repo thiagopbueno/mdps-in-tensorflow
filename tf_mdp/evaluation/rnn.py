@@ -56,7 +56,7 @@ class DeterministicMarkovCell(MarkovCell):
 
             with tf.name_scope("transition_cell"):
                 action = inputs
-                next_state =  self.mdp.transition(state, action)
+                next_state = self.mdp.transition(state, action)
 
             with tf.name_scope("reward_cell"):
                 reward = self.mdp.reward(next_state, action)
@@ -99,7 +99,7 @@ class StochasticMarkovCell(MarkovCell):
                 action = self.policy(state_t)
 
             with tf.name_scope("transition_cell"):
-                next_state = self.mdp.transition(state, action)
+                next_state, _ = self.mdp.transition(state, action)
 
             with tf.name_scope("reward_cell"):
                 reward = self.mdp.reward(next_state, action)

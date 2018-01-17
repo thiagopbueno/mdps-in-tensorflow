@@ -14,17 +14,16 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 import models
-from planning import detplan, stplan
+from planning import detplan, stplan, pgplan
 from utils.plot import plot_losses
 
 import argparse
-import matplotlib.pyplot as plt
 import tensorflow as tf
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["stochastic", "deterministic"], default="stochastic")
+    parser.add_argument("--mode", choices=["pg", "st", "det"])
     parser.add_argument("--model",         "-m",  type=str)
     parser.add_argument("--timesteps",     "-t",  type=int,   default=10)
     parser.add_argument("--batch-size",    "-b",  type=int,   default=1000)
@@ -54,6 +53,12 @@ def load_model(model_id):
     return mdp, start, config
 
 
+def run_policy_gradient_planner(mdp, start, args):
+    return pgplan.run(
+                    mdp, start,
+                    args.timesteps, args.batch_size,
+                    args.discount, args.epochs, args.learning_rate)
+
 def run_stochastic_planner(mdp, start, args):
     return stplan.run(
                     mdp, start,
@@ -75,13 +80,13 @@ if __name__ == '__main__':
     args = parse_args()
     show_info(args)
 
-    # MDP
     mdp, start, config = load_model(args.model)
 
-    # Planner
-    if args.mode == "stochastic":
+    if args.mode == "pg":
+        losses, _ = run_policy_gradient_planner(mdp, start, args)
+    elif args.mode == "st":
         losses, _, _ = run_stochastic_planner(mdp, start, args)
-    elif args.mode == "deterministic":
+    elif args.mode == "det":
         losses, _, _ = run_deterministic_planner(mdp, start, args, config)
 
     report_results(losses)
