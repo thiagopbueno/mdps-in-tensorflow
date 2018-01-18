@@ -17,10 +17,10 @@ import sys
 import abc
 import numpy as np
 import tensorflow as tf
-import tf_mdp.models.mdp as mdp
+from ..mdp import MDP
 
 
-class Reservoir(mdp.MDP, metaclass=abc.ABCMeta): # noqa
+class Reservoir(MDP):
     """
     Reservoir Control: the agent control multiple connected
     reservoirs. Each state is a sequence of water levels in each
@@ -36,6 +36,9 @@ class Reservoir(mdp.MDP, metaclass=abc.ABCMeta): # noqa
     :param environment: parameters of the environment as rain and evaporation
     :type environment: dict
     """
+
+    __metaclass__ = abc.ABCMeta
+
     def __init__(self,
                  graph,
                  system,
@@ -85,7 +88,7 @@ class Reservoir(mdp.MDP, metaclass=abc.ABCMeta): # noqa
         :type state: tf.Tensor(shape=(batch_size, state_size))
         :rtype: tf.Tensor(shape=(batch_size, state_size))
         """
-        return
+        raise NotImplementedError
 
     def transition(self, state, action):
         """

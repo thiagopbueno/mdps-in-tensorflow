@@ -15,7 +15,6 @@
 
 import abc
 
-
 class MDP(metaclass=abc.ABCMeta):
     """
     Interface to define MDP models through stochastic computation graphs.
@@ -31,7 +30,7 @@ class MDP(metaclass=abc.ABCMeta):
 
         :rtype: float
         """
-        return
+        raise NotImplementedError
 
     @abc.abstractproperty
     def state_size(self):
@@ -40,7 +39,7 @@ class MDP(metaclass=abc.ABCMeta):
 
         :rtype: float
         """
-        return
+        raise NotImplementedError
 
     @abc.abstractmethod
     def transition(self, state, action):
@@ -53,7 +52,7 @@ class MDP(metaclass=abc.ABCMeta):
         :type action: tf.Tensor(shape=(batch_size, action_size))
         :rtype: tf.Tensor(shape=(batch_size, state_size))
         """
-        return
+        raise NotImplementedError
 
     @abc.abstractmethod
     def reward(self, state, action):
@@ -66,4 +65,4 @@ class MDP(metaclass=abc.ABCMeta):
         :type action: tf.Tensor(shape=(batch_size, action_size))
         :rtype: tf.Tensor(shape=(batch_size, 1))
         """
-        return
+        raise NotImplementedError
