@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='tf-mdp',
     version='0.1',
-    description='Representation and solution of continuous state-action MDPs in TensorFlow',
+    description='Representation and solution of continuous state-action MDPs in TensorFlow', 
     url='https://github.com/thiagopbueno/tf-mdp',
     license='GNU General Public License',
     author='Thiago Bueno, Felipe Salvatore',

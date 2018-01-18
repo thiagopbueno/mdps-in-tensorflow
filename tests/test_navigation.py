@@ -15,7 +15,6 @@
 
 from tf_mdp.models import mdp
 from tf_mdp.models.navigation import navigation
-
 import numpy as np
 import tensorflow as tf
 import unittest
@@ -53,23 +52,21 @@ class TestNavigation(unittest.TestCase):
 
 		cls.scopes = cls.get_all_scopes()
 
+	@classmethod
+	def get_all_scopes(cls):
+	    scopes = set()
+	    for op in cls.graph.get_operations():
+	        scope = '/'.join(op.name.split('/')[:-1])
+	        if scope:
+	            scopes.add(scope)
+	    return scopes
+
+
 	def setUp(self):
 		self.sess = tf.Session(graph=self.model.graph)
 
 	def tearDown(self):
 		self.sess.close()
-
-
-	# helper functions
-	@classmethod
-	def get_all_scopes(cls):
-		scopes = set()
-		for op in cls.graph.get_operations():
-			scope = '/'.join(op.name.split('/')[:-1])
-			if scope:
-				scopes.add(scope)
-		return scopes
-
 	def get_and_check_tensor(self, name, shape, dtype=tf.float32):
 		tensor = self.model.graph.get_tensor_by_name(name)
 		self.assertEqual(tensor.shape, tf.TensorShape(shape))
