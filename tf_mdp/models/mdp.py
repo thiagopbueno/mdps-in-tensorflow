@@ -16,9 +16,9 @@
 import abc
 
 
-class TF_MDP(metaclass=abc.ABCMeta):
+class MDP(metaclass=abc.ABCMeta):
     """
-    Interface to define models in TF-MDP.
+    Interface to define MDP models through stochastic computation graphs.
 
     A well-formed model must specify the MDP's dynamics and reward
     functions, as well as the dimensions of its actions and states.

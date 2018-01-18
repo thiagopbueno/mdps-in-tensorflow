@@ -91,8 +91,8 @@ class ReservoirTest(unittest.TestCase):
         return tensor
 
     def test_model_is_subclass_of_tf_mdp(self):
-        self.assertTrue(issubclass(self.reservoir.__class__, mdp.TF_MDP))
-        self.assertTrue(isinstance(self.reservoir, mdp.TF_MDP))
+        self.assertTrue(issubclass(self.reservoir.__class__, mdp.MDP))
+        self.assertTrue(isinstance(self.reservoir, mdp.MDP))
 
     def test_model_is_subclass_of_Reservoir(self):
         self.assertTrue(issubclass(self.reservoir.__class__,
