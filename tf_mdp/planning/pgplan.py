@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
+from evaluation import utils
 from evaluation.mrm import MarkovRecurrentModel
 from policy.deterministic import DeterministicPolicyNetwork
 from train.optimizer import PolicyGradientOptimizer
@@ -20,16 +21,18 @@ from train.optimizer import PolicyGradientOptimizer
 import tensorflow as tf
 
 
-def run(mdp, start, timesteps, batch_size, discount, epochs, learning_rate):
+def run(mdp, start, max_time, batch_size, discount, epochs, learning_rate):
 
     # PolicyNetwork
     shape = [mdp.state_size + 1, 20, 5, mdp.action_size]
     policy = DeterministicPolicyNetwork(mdp.graph, shape)
 
     # MarkovRecurrentModel
-    trajectory = MarkovRecurrentModel(mdp, policy).unroll(start, batch_size, timesteps)
+    initial_state = utils.initial_state(start, batch_size)
+    timesteps = utils.timesteps(batch_size, max_time)
+    trajectory = MarkovRecurrentModel(mdp, policy).unroll(initial_state, timesteps)
 
     # PolicyOptimizer
-    optimizer = PolicyGradientOptimizer(mdp.graph, policy, trajectory, learning_rate, discount)
+    optimizer = PolicyGradientOptimizer(mdp, policy, trajectory, learning_rate, discount)
 
     return optimizer.minimize(epochs)

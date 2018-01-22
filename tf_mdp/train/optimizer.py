@@ -22,94 +22,162 @@ import numpy as np
 import tensorflow as tf
 
 
+class PolicyGradientCell(tf.nn.rnn_cell.RNNCell):
+
+    def __init__(self, mdp, policy):
+        self.mdp = mdp
+        self.policy = policy
+
+    @property
+    def input_size(self):
+        return 2 * self.mdp.state_size + 2
+
+    @property
+    def state_size(self):
+        return 1
+
+    @property
+    def output_size(self):
+        return self.mdp.state_size + 2
+
+    def __call__(self, inputs, h, scope=None):
+
+        discount_idx = 0
+        timestep_idx = 1
+        state_idx = timestep_idx + 1
+        next_state_idx = state_idx + self.mdp.state_size
+        Q_idx = next_state_idx + self.mdp.state_size
+
+        with self.mdp.graph.as_default():
+
+            with tf.name_scope("pg_celll/inputs"):
+                inputs = tf.unstack(inputs, axis=1, name="inputs")
+                discount = tf.reshape(inputs[discount_idx], [-1, 1], name="discount")
+                timestep = tf.reshape(inputs[timestep_idx], [-1, 1], name="timestep")
+                state = tf.stack(inputs[state_idx : next_state_idx], axis=1, name="state")
+                next_state = tf.stack(inputs[next_state_idx : Q_idx], axis=1, name="next_state")
+                Q = tf.reshape(inputs[Q_idx : ], [-1, 1], name="Q")
+
+            with tf.name_scope("pg_cell/policy_cell"):
+                state_t = tf.concat([state, timestep], axis=1, name="state_t")
+                action = self.policy(state_t)
+
+            with tf.name_scope("pg_cell/transition_cell"):
+                next_state_dist = self.mdp.transition(state, action)
+                log_prob = next_state_dist.log_prob(next_state, name="log_prob")
+
+            with tf.name_scope("pg_cell/reward_cell"):
+                reward = tf.multiply(discount, self.mdp.reward(state, action), name="discounted_reward")
+
+            with tf.name_scope("pg_cell/outputs"):
+                outputs = tf.concat([reward, log_prob, Q], axis=1, name="outputs")
+
+            with tf.name_scope("pg_cell/next_h"):
+                state_log_prob = tf.reduce_sum(log_prob, axis=1, keep_dims=True, name="state_log_prob")
+                weighted_log_prob = tf.multiply(Q, state_log_prob, name="weighted_log_prob")
+                next_h = tf.add(h, reward + weighted_log_prob * Q, name="next_h")
+
+        return outputs, next_h
+
+
 class PolicyGradientOptimizer():
 
-    def __init__(self, graph, policy, trajectory, learning_rate, gamma):
-        self.graph = graph
+    def __init__(self, mdp, policy, trajectory, learning_rate, gamma):
+        self.mdp = mdp
         self.policy = policy
         self.trajectory = trajectory
         self.learning_rate = learning_rate
         self.gamma = gamma
 
-        with self.graph.as_default():
-            self.max_time = len(self.trajectory.states)
-            self.batch_size = self.trajectory.states[0].shape[0].value
-            self._compute_loss()
-            self._compute_gradients()
-            self._apply_gradients()
+        self.batch_size = self.trajectory.states.shape[0].value
+        self.max_time = self.trajectory.states.shape[1].value
 
-    def _compute_loss(self):
+        with self.mdp.graph.as_default():
+            self._discount_schedule()
+            self._total_discounted_reward()
+            self._reward_to_go()
+            self._loss()
+            self._surrogate_loss()
+            self._train_op()
+
+    def _discount_schedule(self):
         discount_schedule = np.geomspace(1, self.gamma ** (self.max_time - 1), self.max_time, dtype=np.float32)
         discount_schedule = np.repeat([discount_schedule], self.batch_size, axis=0)
         discount_schedule = np.reshape(discount_schedule, (self.batch_size, self.max_time, 1))
         self.discount_schedule = tf.constant(discount_schedule, dtype=tf.float32, name="discount_schedule")
-        self.total = tf.reduce_sum(tf.stack(self.trajectory.rewards, axis=1) * self.discount_schedule, axis=1, name="total_discount_reward")
+
+    def _total_discounted_reward(self):
+        self.total_discounted_reward = tf.multiply(self.trajectory.rewards, self.discount_schedule, name="total_discount_reward")
+
+    def _reward_to_go(self):
+        self.Q = tf.cumsum(self.total_discounted_reward, axis=1, exclusive=True, reverse=True, name="Q")
+        self.baseline = tf.reduce_mean(self.Q, axis=0, name="baseline")
+
+    def _loss(self):
+        self.total = tf.reduce_sum(self.total_discounted_reward, axis=1, name="total")
         self.loss = tf.reduce_mean(self.total, axis=0, name="loss")
 
-    def _compute_gradients(self):
-        Q = tf.cumsum(self.trajectory.rewards, exclusive=True, reverse=True, name="Q")
-        baseline = tf.reduce_mean(Q, axis=1, name="baseline")
-        print(Q)
-        print(baseline)
+    def _surrogate_loss(self):
+        self._cell = PolicyGradientCell(self.mdp, self.policy)
 
-        self.grads_rewards = defaultdict(list)
-        self.grads_future_rewards = defaultdict(list)
-        self.grads_and_vars = []
+        self._initial_state = tf.zeros([self.batch_size, 1], name="initial_state")
 
-        params = self.policy.params
+        timesteps_shape = [self.batch_size, self.max_time, 1]
+        states_shape = [self.batch_size, self.max_time, self.mdp.state_size]
+        Q_shape = [self.batch_size, self.max_time, 1]
+        self._timesteps = tf.placeholder(tf.float32, shape=timesteps_shape, name="timesteps")
+        self._states = tf.placeholder(tf.float32, shape=states_shape, name="states")
+        self._next_states = tf.placeholder(tf.float32, shape=states_shape, name="next_states")
+        self._Q = tf.placeholder(tf.float32, shape=Q_shape, name="Q")
+        self._inputs = tf.concat([self.discount_schedule, self._timesteps, self._states, self._next_states, self._Q], axis=2, name="inputs")
 
-        discount = 1.0
-        for t in range(self.max_time):
+        outputs, final_h = tf.nn.dynamic_rnn(
+                                self._cell,
+                                self._inputs,
+                                initial_state=self._initial_state,
+                                dtype=tf.float32,
+                                scope="recurrent")
 
-            with tf.name_scope("t{}/".format(t)):
+        self.surrogate_loss = tf.reduce_mean(final_h, name="surrogate_loss")
 
-                state = self.trajectory.states[t]
-                reward = self.trajectory.rewards[t]
-                next_state = self.trajectory.next_states[t]
-                log_prob = self.trajectory.log_probs[t]
-
-                average_reward = tf.multiply(discount, tf.reduce_mean(reward), name="average_reward")
-                grads_reward = tf.gradients(ys=average_reward, xs=params, stop_gradients=[state, next_state], name="grads_reward")
-
-                log_prob = tf.reduce_sum(log_prob, axis=1)
-                average_log_prob_future_reward = tf.reduce_mean(log_prob * (Q[t] - baseline[t]), name="average_log_prob_future_reward")
-                grads_future_reward = tf.gradients(ys=average_log_prob_future_reward, xs=params, stop_gradients=[state, next_state, Q], name="grads_future_reward")
-
-                discount *= self.gamma
-
-                for j, param in enumerate(params):
-                    if grads_reward[j] is not None:
-                        self.grads_rewards[param].append(grads_reward[j])
-                    self.grads_future_rewards[param].append(grads_future_reward[j])
-
-        with tf.name_scope("grads"):
-            for j, param in enumerate(params):
-                grad_1 = self.grads_rewards[param]
-                grad_2 = self.grads_future_rewards[param]
-                grad = tf.reduce_sum(tf.stack(grad_1 + grad_2), axis=0, name="grad")
-                self.grads_and_vars.append((grad, param))
-                assert(grad.shape == param.shape)
-
-    def _apply_gradients(self):
-        with tf.name_scope("update"):
-            updates = []
-            for grad, var in self.grads_and_vars:
-                updates.append(var.assign(var + self.learning_rate * grad))
-            self.train_op = tf.group(*updates, name="train_op")
+    def _train_op(self):
+        self.train_op = tf.train.RMSPropOptimizer(self.learning_rate).minimize(self.surrogate_loss)
 
     def minimize(self, epochs, show_progress=True):
         losses = []
+
         start = time.time()
-        with tf.Session(graph=self.graph) as sess:
+        with tf.Session(graph=self.mdp.graph) as sess:
             sess.run(tf.global_variables_initializer())
+
             for step in range(epochs):
-                loss, _ = sess.run([self.loss, self.train_op])
+
+                # Sample trajectories
+                timesteps, states, next_states, Q, baseline = sess.run([
+                                                                self.trajectory.timesteps,
+                                                                self.trajectory.states,
+                                                                self.trajectory.next_states,
+                                                                self.Q,
+                                                                self.baseline])
+
+                # Apply gradients and evaluate loss
+                feed_dict = {
+                    self._timesteps: timesteps,
+                    self._states: states,
+                    self._next_states: next_states,
+                    self._Q: Q
+                }
+                loss, _ = sess.run([self.loss, self.train_op], feed_dict=feed_dict)
                 losses.append(loss[0])
+
+                # Show progress
                 if show_progress and step % 10 == 0:
-                    print('Epoch {0:5}: loss = {1:.6f}\r'.format(step, loss[0]), end='')
+                    print('Epoch {0:5}: loss = {1:.6f}\r'.format(step, loss[0]), end="")
+
         end = time.time()
         uptime = end - start
         print("\nDone in {0:.6f} sec.\n".format(uptime))
+
         return losses, uptime
 
 
