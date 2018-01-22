@@ -33,9 +33,11 @@ class Navigation(MDP):
 
     def __init__(self, graph, config):
         self.graph = graph
+        self.config = config
 
         self.grid = config["grid"]
         self.ndim = config["grid"]["ndim"]
+        self.deceleration = config["grid"]["deceleration"]
 
         with self.graph.as_default():
 
@@ -46,11 +48,13 @@ class Navigation(MDP):
                 self._goal = tf.constant(config["grid"]["goal"], dtype=tf.float32, name="goal")
 
             with tf.name_scope("constants/deceleration"):
-                deceleration = config["grid"]["deceleration"][0]
-                self._center = tf.constant(deceleration["center"], dtype=tf.float32, name="center")
-                self._decay  = tf.constant(deceleration["decay"],  dtype=tf.float32, name="decay")
                 self._1_00 = tf.constant(1.00, dtype=tf.float32)
                 self._2_00 = tf.constant(2.00, dtype=tf.float32)
+                self._center = []
+                self._decay = []
+                for i, deceleration in enumerate(self.deceleration):
+                    self._center.append(tf.constant(deceleration["center"], dtype=tf.float32, name="center_{}".format(i)))
+                    self._decay.append(tf.constant(deceleration["decay"],  dtype=tf.float32, name="decay_{}".format(i)))
 
     @property
     def action_size(self):
@@ -88,6 +92,7 @@ class DeterministicNavigation(Navigation):
             with tf.name_scope("transition"):
 
                 with tf.name_scope("deceleration"):
+
                     d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center), 1, keep_dims=True), name="d")
                     deceleration = self._2_00 / (self._1_00 + tf.exp(-self._decay * d)) - self._1_00
                     decelerated_action = tf.multiply(deceleration, action, name="decelerated_action")
@@ -167,20 +172,19 @@ class NoisyNavigation(Navigation):
         with self.graph.as_default():
 
             with tf.name_scope("transition/deceleration"):
-                d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center), 1, keep_dims=True), name="d")
-                deceleration = self._2_00 / (self._1_00 + tf.exp(-self._decay * d)) - self._1_00
+                deceleration = self._1_00
+                for i in range(len(self.deceleration)):
+                    d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center[i]), 1, keep_dims=True), name="d_{}".format(i))
+                    deceleration *= self._2_00 / (self._1_00 + tf.exp(-self._decay[i] * d)) - self._1_00
                 decelerated_action = tf.multiply(deceleration, action, name="decelerated_action")
 
             with tf.name_scope("transition/next_position"):
                 p = tf.add(state, decelerated_action, name="p")
-                velocity = tf.norm(action, axis=1, keep_dims=True, name="velocity")
-                scale = tf.multiply(self._scale_max / self._max_velocity, velocity, name="scale")
-                next_state_dist = tf.distributions.Normal(loc=p, scale=scale, name="next_state_dist")
-                next_state_sampled = next_state_dist.sample(name="next_state_sampled")
-                next_state = tf.stop_gradient(tf.clip_by_value(
-                                next_state_sampled,
-                                self._grid_lower_bound, self._grid_upper_bound,
-                                name="next_state"))
-                next_state_log_prob = next_state_dist.log_prob(next_state_sampled, name="next_state_log_prob")
+                loc = tf.clip_by_value(p, self._grid_lower_bound, self._grid_upper_bound, name="loc")
 
-        return next_state, next_state_log_prob
+                v = tf.norm(action, axis=1, keep_dims=True, name="v")
+                scale = tf.multiply(self._scale_max / self._max_velocity, v, name="scale")
+
+                next_state_dist = tf.distributions.Normal(loc=loc, scale=scale, name="next_state_dist")
+
+        return next_state_dist
