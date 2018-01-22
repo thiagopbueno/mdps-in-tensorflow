@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 def plot_losses(losses):
-    plt.plot(losses)
+    plt.plot(losses, 'bo-')
     plt.title("Losses")
     plt.xlabel("Epochs")
     plt.ylabel("$\\mathcal{L}$")

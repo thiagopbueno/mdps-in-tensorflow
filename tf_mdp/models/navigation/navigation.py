@@ -177,10 +177,10 @@ class NoisyNavigation(Navigation):
                 scale = tf.multiply(self._scale_max / self._max_velocity, velocity, name="scale")
                 next_state_dist = tf.distributions.Normal(loc=p, scale=scale, name="next_state_dist")
                 next_state_sampled = next_state_dist.sample(name="next_state_sampled")
-                next_state = tf.clip_by_value(
+                next_state = tf.stop_gradient(tf.clip_by_value(
                                 next_state_sampled,
                                 self._grid_lower_bound, self._grid_upper_bound,
-                                name="next_state")
+                                name="next_state"))
                 next_state_log_prob = next_state_dist.log_prob(next_state_sampled, name="next_state_log_prob")
 
         return next_state, next_state_log_prob

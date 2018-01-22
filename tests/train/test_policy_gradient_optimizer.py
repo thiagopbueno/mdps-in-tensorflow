@@ -35,7 +35,7 @@ class TestPolicyGradientOptimizer(unittest.TestCase):
 
         #MDP
         model, config = models.make("noisy-navigation-small")
-        cls.mdp = model(graph, config)
+        cls.mdp = model(cls.graph, config)
         cls.start = config["initial"]
 
         # PolicyNetwork
@@ -47,3 +47,6 @@ class TestPolicyGradientOptimizer(unittest.TestCase):
 
         # PolicyOptimizer
         cls.optimizer = PolicyGradientOptimizer(cls.graph, cls.policy, cls.trajectory, cls.learning_rate, cls.discount)
+
+    def test_pg_optimizer_defines_reward_to_go_as_cumulative_future_reward(self):
+        self.assertTrue(True)

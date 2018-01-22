@@ -36,7 +36,7 @@ class PolicyGradientOptimizer():
             self.batch_size = self.trajectory.states[0].shape[0].value
             self._compute_loss()
             self._compute_gradients()
-            self._apply_gradients()
+            # self._apply_gradients()
 
     def _compute_loss(self):
         discount_schedule = np.geomspace(1, self.gamma ** (self.max_time - 1), self.max_time, dtype=np.float32)
@@ -47,48 +47,31 @@ class PolicyGradientOptimizer():
         self.loss = tf.reduce_mean(self.total, axis=0, name="loss")
 
     def _compute_gradients(self):
-        Q = tf.cumsum(self.trajectory.rewards, exclusive=True, reverse=True, name="Q")
-        baseline = tf.reduce_mean(Q, axis=1, name="baseline")
-        print(Q)
-        print(baseline)
+        self.rewards = tf.stack(self.trajectory.rewards, axis=1)
+        self.Q = tf.cumsum(self.rewards * self.discount_schedule, exclusive=True, reverse=True, name="Q")
+        self.Q = tf.unstack(self.Q, axis=1, name="Q")
+        self.Q = tf.stop_gradient(self.Q)
 
-        self.grads_rewards = defaultdict(list)
-        self.grads_future_rewards = defaultdict(list)
-        self.grads_and_vars = []
+        self.baseline = tf.reduce_mean(self.Q, axis=1, name="baseline")
 
         params = self.policy.params
 
-        discount = 1.0
+        weighted_log_probs = []
         for t in range(self.max_time):
 
             with tf.name_scope("t{}/".format(t)):
+                log_prob = tf.reduce_sum(self.trajectory.log_probs[t], axis=1, keep_dims=True, name="log_prob")
+                weighted_log_probs.append(tf.multiply(log_prob, self.Q[t], name="weighted_log_prob"))
 
-                state = self.trajectory.states[t]
-                reward = self.trajectory.rewards[t]
-                next_state = self.trajectory.next_states[t]
-                log_prob = self.trajectory.log_probs[t]
+        self.weighted_log_probs = tf.stack(weighted_log_probs, axis=1, name="weighted_log_probs")
+        self.weighted_log_prob = tf.reduce_sum(self.weighted_log_probs, axis=1, name="weighted_log_prob")
+        self.surrogate_loss = tf.reduce_mean(self.total + self.weighted_log_prob, name="surrogate_loss")
 
-                average_reward = tf.multiply(discount, tf.reduce_mean(reward), name="average_reward")
-                grads_reward = tf.gradients(ys=average_reward, xs=params, stop_gradients=[state, next_state], name="grads_reward")
+        self.train_op = tf.train.AdagradOptimizer(self.learning_rate).minimize(self.surrogate_loss)
 
-                log_prob = tf.reduce_sum(log_prob, axis=1)
-                average_log_prob_future_reward = tf.reduce_mean(log_prob * (Q[t] - baseline[t]), name="average_log_prob_future_reward")
-                grads_future_reward = tf.gradients(ys=average_log_prob_future_reward, xs=params, stop_gradients=[state, next_state, Q], name="grads_future_reward")
+        # grads = tf.gradients(ys=self.surrogate_loss, xs=params, stop_gradients=self.Q, name="grads")
+        # self.grads_and_vars = zip(grads, params)
 
-                discount *= self.gamma
-
-                for j, param in enumerate(params):
-                    if grads_reward[j] is not None:
-                        self.grads_rewards[param].append(grads_reward[j])
-                    self.grads_future_rewards[param].append(grads_future_reward[j])
-
-        with tf.name_scope("grads"):
-            for j, param in enumerate(params):
-                grad_1 = self.grads_rewards[param]
-                grad_2 = self.grads_future_rewards[param]
-                grad = tf.reduce_sum(tf.stack(grad_1 + grad_2), axis=0, name="grad")
-                self.grads_and_vars.append((grad, param))
-                assert(grad.shape == param.shape)
 
     def _apply_gradients(self):
         with tf.name_scope("update"):

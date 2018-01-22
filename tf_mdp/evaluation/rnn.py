@@ -59,7 +59,7 @@ class DeterministicMarkovCell(MarkovCell):
                 next_state = self.mdp.transition(state, action)
 
             with tf.name_scope("reward_cell"):
-                reward = self.mdp.reward(next_state, action)
+                reward = self.mdp.reward(state, action)
 
             with tf.name_scope("output"):
                 outputs = tf.concat([reward, next_state, action], axis=1, name="outputs")
