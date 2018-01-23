@@ -21,13 +21,14 @@ from train.optimizer import PolicyGradientOptimizer
 import tensorflow as tf
 
 
-def run(mdp, start, max_time, batch_size, discount, epochs, learning_rate):
+def run(mdp, config, max_time, batch_size, discount, epochs, learning_rate):
 
     # PolicyNetwork
     shape = [mdp.state_size + 1, 20, 5, mdp.action_size]
     policy = DeterministicPolicyNetwork(mdp.graph, shape)
 
     # MarkovRecurrentModel
+    start = config["initial"]
     initial_state = utils.initial_state(start, batch_size)
     timesteps = utils.timesteps(batch_size, max_time)
     trajectory = MarkovRecurrentModel(mdp, policy).unroll(initial_state, timesteps)

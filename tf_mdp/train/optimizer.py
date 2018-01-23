@@ -178,7 +178,7 @@ class PolicyGradientOptimizer():
         uptime = end - start
         print("\nDone in {0:.6f} sec.\n".format(uptime))
 
-        return losses, uptime
+        return losses
 
 
 class PolicyOptimizer(metaclass=abc.ABCMeta):
@@ -222,7 +222,7 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
 
             sess.run(tf.global_variables_initializer())
 
-            losses, totals = [], []
+            losses = []
             for epoch_idx in range(epoch):
 
                 # backprop and update weights
@@ -230,7 +230,6 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
 
                 # store results
                 losses.append(loss[0])
-                totals.append(total)
 
                 # show information
                 if show_progress and epoch_idx % 10 == 0:
@@ -240,7 +239,7 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
         uptime = end - start
         print("\nDone in {0:.6f} sec.\n".format(uptime))
 
-        return losses, totals, uptime
+        return losses
 
 
 class SGDPolicyOptimizer(PolicyOptimizer):
@@ -356,4 +355,5 @@ class ActionOptimizer(object):
         uptime = end - start
         print("\nDone in {0:.6f} sec.\n".format(uptime))
 
-        return losses, best_batch, uptime
+        # return losses, best_batch, uptime
+        return losses

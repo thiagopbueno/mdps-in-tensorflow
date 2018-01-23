@@ -21,7 +21,7 @@ import numpy as np
 import tensorflow as tf
 
 
-def run(mdp, start, limits, timesteps, batch_size, discount, epochs, learning_rate):
+def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate):
 
     # Action variables
     with mdp.graph.as_default():
@@ -30,6 +30,7 @@ def run(mdp, start, limits, timesteps, batch_size, discount, epochs, learning_ra
             name="actions")
 
     # Trajectory evaluation
+    start = config["initial"]
     cell = DeterministicMarkovCell(mdp)
     rnn = MarkovRecurrentModel(cell)
     initial_state = np.repeat([start], batch_size, axis=0).astype(np.float32)
@@ -41,6 +42,7 @@ def run(mdp, start, limits, timesteps, batch_size, discount, epochs, learning_ra
         loss = tf.reduce_mean(tf.square(total), name="loss") # Mean-Squared Error (MSE)
 
     # ActionOptimizer
+    limits = config["limits"]
     metrics = {
         "loss":  loss,
         "total": total,
@@ -49,4 +51,5 @@ def run(mdp, start, limits, timesteps, batch_size, discount, epochs, learning_ra
         "rewards": rewards
     }
     optimizer = ActionOptimizer(mdp.graph, metrics, learning_rate, limits)
+
     return optimizer.minimize(epochs)

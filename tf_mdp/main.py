@@ -14,6 +14,7 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 import models
+import logz
 from planning import detplan, stplan, pgplan
 from utils.plot import plot_losses
 
@@ -30,10 +31,14 @@ def parse_args():
     parser.add_argument("--discount",      "-d",  type=float, default=0.9)
     parser.add_argument("--epochs",        "-e",  type=int,   default=200)
     parser.add_argument("--learning-rate", "-lr", type=float, default=1.0e-5)
-    return parser.parse_args()
+    parser.add_argument("--trials",        "-ts", type=int,   default=5)
+    parser.add_argument("--log-dir",       "-lg", type=str,   default="/tmp/")
+    args = parser.parse_args()
+    show_parameters_info(args)
+    return args
 
 
-def show_info(args):
+def show_parameters_info(args):
     print()
     print(">> Optimizing {} ...".format(args.model))
     print(">> Hyperparameters:")
@@ -42,6 +47,7 @@ def show_info(args):
     print("discount      = {}".format(args.discount))
     print("epochs        = {}".format(args.epochs))
     print("learning rate = {}".format(args.learning_rate))
+    print("trials        = {}".format(args.trials))
     print()
 
 
@@ -49,44 +55,35 @@ def load_model(model_id):
     graph = tf.Graph()
     model, config = models.make(model_id)
     mdp = model(graph, config)
-    start = config["initial"]
-    return mdp, start, config
+    return mdp, config
 
 
-def run_policy_gradient_planner(mdp, start, args):
-    return pgplan.run(
-                    mdp, start,
+def run_planner(planner, args):
+    trials = {}
+    for i in range(args.trials):
+        print(">> Starting trial #{} ...".format(i))
+        mdp, config = load_model(args.model)
+        losses = planner.run(
+                    mdp, config,
                     args.timesteps, args.batch_size,
                     args.discount, args.epochs, args.learning_rate)
-
-def run_stochastic_planner(mdp, start, args):
-    return stplan.run(
-                    mdp, start,
-                    args.timesteps, args.batch_size,
-                    args.discount, args.epochs, args.learning_rate)
-
-def run_deterministic_planner(mdp, start, args, config):
-    return detplan.run(
-                    mdp, start, config["limits"],
-                    args.timesteps, args.batch_size,
-                    args.discount, args.epochs, args.learning_rate)
+        trials["run{}".format(i)] = losses
+    return trials
 
 
-def report_results(losses):
-    plot_losses(losses)
+def save_results(log_dir, trials):
+    print(">> Logging results to {} ...".format(log_dir))
+    logz.logging(log_dir, trials)
 
 
 if __name__ == '__main__':
     args = parse_args()
-    show_info(args)
-
-    mdp, start, config = load_model(args.model)
 
     if args.mode == "pg":
-        losses, _ = run_policy_gradient_planner(mdp, start, args)
+        trials = run_planner(pgplan, args)
     elif args.mode == "st":
-        losses, _, _ = run_stochastic_planner(mdp, start, args)
+        trials = run_planner(stplan, args)
     elif args.mode == "det":
-        losses, _, _ = run_deterministic_planner(mdp, start, args, config)
+        trials = run_planner(detplan, args)
 
-    report_results(losses)
+    save_results(args.log_dir, trials)

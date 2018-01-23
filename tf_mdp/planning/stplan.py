@@ -21,18 +21,19 @@ from train.optimizer import SGDPolicyOptimizer, PolicyGradientOptimizer
 import tensorflow as tf
 
 
-def run(mdp, start, timesteps, batch_size, discount, epochs, learning_rate):
+def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate):
 
     # PolicyNetwork
     shape = [mdp.state_size + 1, 20, 5, mdp.action_size]
     policy = DeterministicPolicyNetwork(mdp.graph, shape)
 
     # PolicyEvaluation
+    start = config["initial"]
     mc = MCPolicyEvaluation(mdp, policy,
-                                initial_state=start,
-                                max_time=timesteps,
-                                batch_size=batch_size,
-                                gamma=discount)
+                            initial_state=start,
+                            max_time=timesteps,
+                            batch_size=batch_size,
+                            gamma=discount)
 
     # PolicyOptimizer
     metrics = {

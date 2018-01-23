@@ -12,15 +12,8 @@ $ python3 tf_mdp/main.py --help
 ```
 
 ```shell
-$ python3 tf_mdp/main.py --mode det -m navigation-small-1-zone -e 100 -lr 0.1
-```
+$ python3 tf_mdp/main.py --mode pg -m navigation-small-1-zone -e 100 -lr 0.01 -t 8 --log-dir results/pg/navigation-small-1-zone/ -ts 10
 
-```shell
-$ python3 tf_mdp/main.py --mode st -m noisy-navigation-small -e 100 -lr 0.001 -t 8
-$ python3 tf_mdp/main.py --mode st -m noisy-navigation-small-1-zone -e 100 -lr 0.001 -t 8
-```
+$ python3 tf_mdp/main.py --mode pg -m navigation-small-2-zones -e 100 -lr 0.01 -t 15 --log-dir results/pg/navigation-small-2-zones/ -ts 10
 
-```shell
-$ python3 tf_mdp/main.py --mode pg -m noisy-navigation-small -e 100 -lr 0.01 -t 8
-$ python3 tf_mdp/main.py --mode pg -m noisy-navigation-small-1-zone -e 100 -lr 0.01 -t 8
 ```
