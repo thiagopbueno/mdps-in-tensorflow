@@ -25,30 +25,14 @@ def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate):
 
     # Action variables
     with mdp.graph.as_default():
-        actions = tf.Variable(
+        plan = tf.Variable(
             tf.truncated_normal(shape=[batch_size, timesteps, mdp.state_size], stddev=0.05),
-            name="actions")
+            name="plan")
 
-    # Trajectory evaluation
     start = config["initial"]
-    cell = DeterministicMarkovCell(mdp)
-    rnn = MarkovRecurrentModel(cell)
-    initial_state = np.repeat([start], batch_size, axis=0).astype(np.float32)
-    rewards, states, _ = rnn.unroll(initial_state, actions)
-
-    # loss
-    with mdp.graph.as_default():
-        total = tf.reduce_sum(rewards, axis=1, name="total")
-        loss = tf.reduce_mean(tf.square(total), name="loss") # Mean-Squared Error (MSE)
+    limits = config.get("limits", None)
 
     # ActionOptimizer
-    limits = config.get("limits", None)
-    metrics = {
-        "loss":  loss,
-        "total": total,
-        "states":  states,
-        "actions": rnn.inputs,
-        "rewards": rewards
-    }
-    optimizer = ActionOptimizer(mdp.graph, metrics, learning_rate, limits)
+    optimizer = ActionOptimizer(mdp, start, plan, learning_rate, limits)
+
     return optimizer.minimize(epochs)

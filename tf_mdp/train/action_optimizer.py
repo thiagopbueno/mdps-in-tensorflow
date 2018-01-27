@@ -18,80 +18,128 @@ import tensorflow as tf
 import time
 
 
-class ActionOptimizer(object):
-    
-    def __init__(self, graph, metrics, learning_rate, limits=None):
-        self.graph = graph
+class ActionCell(tf.nn.rnn_cell.RNNCell):
 
-        # performance metrics
-        self.loss = metrics["loss"]
-        self.total = metrics["total"]
+    def __init__(self, mdp):
+        self.mdp = mdp
 
-        # trajectory metrics
-        self.states = metrics["states"]
-        self.actions = metrics["actions"]
-        self.rewards = metrics["rewards"]
-
-        # hyperparameters
-        self.hyperparameters = {}
-        self.hyperparameters["learning_rate"] = learning_rate
-        self.hyperparameters["limits"] = limits
-
-        with self.graph.as_default():
-            self._build_optimization_ops()
+    def input_size(self):
+        return self.mdp.action_size
 
     @property
-    def learning_rate(self):
-        """
-        Returns hyperparameter learning rate.
+    def state_size(self):
+        return self.mdp.state_size
 
-        :rtype: float
-        """
-        return self._optimizer._learning_rate
+    @property
+    def output_size(self):
+        return self.mdp.state_size + 1
 
-    def _build_optimization_ops(self):
-        limits = self.hyperparameters["limits"]
-        self.enforce_action_limits = None
-        if limits is not None:
-            self.enforce_action_limits = tf.assign(
-                                            self.actions,
-                                            tf.clip_by_value(self.actions,
-                                                            limits[0],
-                                                            limits[1]), name="action_limits")
+    def __call__(self, inputs, state, scope=None):
+        with self.mdp.graph.as_default():
 
-        learning_rate = self.hyperparameters["learning_rate"]
-        with tf.name_scope("ActionOptimizer"):
-            self._optimizer = tf.train.RMSPropOptimizer(learning_rate)
-            self.train_step = self._optimizer.minimize(self.loss)
+            with tf.name_scope("transition_cell"):
+                action = inputs
+                next_state_dist = self.mdp.transition(state, action)
+                next_state = next_state_dist.loc
+
+            with tf.name_scope("reward_cell"):
+                reward = self.mdp.reward(state, action)
+
+            with tf.name_scope("output"):
+                outputs = tf.concat([reward, next_state], axis=1, name="outputs")
+
+        return outputs, next_state
+
+
+class ActionOptimizer(object):
+
+    def __init__(self, mdp, start, plan, learning_rate, limits=None):
+        self.mdp = mdp
+        self.plan = plan
+        self.start = start
+
+        self.cell = ActionCell(mdp)
+
+        self.limits = limits
+        self.learning_rate = learning_rate
+
+        with self.mdp.graph.as_default():
+            self._initial_state()
+            self._limits()
+            self._trajectory()
+            self._loss()
+            self._train_op()
+
+    def _initial_state(self):
+        batch_size = self.plan.shape[0].value
+        initial_state = np.repeat([self.start], batch_size, axis=0).astype(np.float32)
+        self.initial_state = tf.constant(initial_state, name="initial_state")
+
+    def _limits(self):
+        with tf.name_scope("action_optimizer/limits"):
+            self.enforce_action_limits = None
+            if self.limits is not None:
+                self.enforce_action_limits = tf.assign(
+                                                self.plan,
+                                                tf.clip_by_value(self.plan,
+                                                                 self.limits[0],
+                                                                 self.limits[1]),
+                                                name="action_limits")
+
+    def _trajectory(self):
+        max_time = self.plan.shape[1]
+
+        input_size = self.cell.input_size
+        state_size = self.mdp.state_size
+        action_size = self.mdp.action_size
+
+        outputs, self.final_state = tf.nn.dynamic_rnn(
+                                        self.cell,
+                                        self.plan,
+                                        initial_state=self.initial_state,
+                                        dtype=tf.float32,
+                                        scope="action_optimizer/rnn")
+
+        with tf.name_scope("action_optimizer/rnn/outputs"):
+            outputs = tf.unstack(outputs, axis=2)
+            self.rewards = tf.reshape(outputs[0], [-1, max_time, 1])
+            self.states  = tf.stack(outputs[1 : ], axis=2)
+
+    def _loss(self):
+        with tf.name_scope("action_optimizer/loss"):
+            self.total = tf.reduce_sum(self.rewards, axis=1, name="total")
+            self.loss = tf.reduce_mean(tf.square(self.total), name="mse") # Mean-Squared Error (MSE)
+
+    def _train_op(self):
+        with tf.name_scope("action_optimizer"):
+            self._optimizer = tf.train.RMSPropOptimizer(self.learning_rate)
+            self.train_op = self._optimizer.minimize(self.loss)
 
     def minimize(self, epoch, show_progress=True):
         start = time.time()
-        with tf.Session(graph=self.graph) as sess:
+        with tf.Session(graph=self.mdp.graph) as sess:
 
             sess.run(tf.global_variables_initializer())
 
             losses = []
             for epoch_idx in range(epoch):
-                # backprop and update weights
-                sess.run(self.train_step)
 
-                # maintain action constraints if any
+                sess.run(self.train_op)
+
                 if self.enforce_action_limits is not None:
                     sess.run(self.enforce_action_limits)
 
-                # store and show loss information
                 loss = sess.run(self.loss)
                 losses.append(loss)
                 if show_progress and epoch_idx % 10 == 0:
                     print('Epoch {0:5}: loss = {1}\r'.format(epoch_idx, loss), end="")
 
-            # index of best solution among all planners
             with tf.name_scope("best_batch"):
                 best_batch_idx = tf.argmax(self.total, axis=0, name="best_batch_index")
                 best_batch_idx = sess.run(best_batch_idx)
                 best_batch = {
                     "total":   np.squeeze(sess.run(self.total)[best_batch_idx]).tolist(),
-                    "actions": np.squeeze(sess.run(self.actions)[best_batch_idx]).tolist(),
+                    "actions": np.squeeze(sess.run(self.plan)[best_batch_idx]).tolist(),
                     "states":  np.squeeze(sess.run(self.states)[best_batch_idx]).tolist(),
                     "rewards": np.squeeze(sess.run(self.rewards)[best_batch_idx]).tolist()
                 }
