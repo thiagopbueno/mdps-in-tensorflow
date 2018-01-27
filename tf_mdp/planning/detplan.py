@@ -14,7 +14,7 @@
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
 from policy.deterministic import DeterministicPolicyNetwork
-from train.optimizer import ActionOptimizer
+from train.action_optimizer import ActionOptimizer
 from evaluation.rnn import DeterministicMarkovCell, MarkovRecurrentModel
 
 import numpy as np
