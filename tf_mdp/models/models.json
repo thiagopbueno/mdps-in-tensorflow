@@ -1,7 +1,7 @@
 {
     "navigation-small-no-deceleration": {
         "module": "navigation.navigation",
-        "class_name": "NoisyNavigation",
+        "class_name": "Navigation",
         "config": {
             "initial": [1.0,  1.0],
             "grid": {
@@ -14,7 +14,7 @@
     },
     "navigation-small-1-zone": {
         "module": "navigation.navigation",
-        "class_name": "NoisyNavigation",
+        "class_name": "Navigation",
         "config": {
             "initial": [1.0,  1.0],
             "grid": {
@@ -30,7 +30,7 @@
     },
     "navigation-small-2-zones": {
         "module": "navigation.navigation",
-        "class_name": "NoisyNavigation",
+        "class_name": "Navigation",
         "config": {
             "initial": [2.0,  2.0],
             "grid": {
@@ -52,7 +52,7 @@
     },
     "navigation-small-4-zones": {
         "module": "navigation.navigation",
-        "class_name": "NoisyNavigation",
+        "class_name": "Navigation",
         "config": {
             "initial": [2.0,  2.0],
             "grid": {
@@ -82,7 +82,7 @@
     },
     "navigation-small-1-wall": {
         "module": "navigation.navigation",
-        "class_name": "NoisyNavigation",
+        "class_name": "Navigation",
         "config": {
             "initial": [1.0,  5.0],
             "grid": {
@@ -132,7 +132,7 @@
     },
     "navigation-medium-2-walls": {
         "module": "navigation.navigation",
-        "class_name": "NoisyNavigation",
+        "class_name": "Navigation",
         "config": {
             "initial": [1.0,  5.0],
             "grid": {

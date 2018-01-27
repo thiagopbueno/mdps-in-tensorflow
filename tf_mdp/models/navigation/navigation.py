@@ -15,15 +15,14 @@
 
 from ..mdp import MDP
 
-import numpy as np
 import tensorflow as tf
 
 
 class Navigation(MDP):
     """
-    Navigation: base class for the 2D navigation domain,
-    in which an agent is supposed to get to a goal position
-    from a start position as fast as possible.
+    Navigation: an agent is supposed to get to a goal position
+    from a start position as fast as possible while avoiding
+    deceleration zones.
 
     :param graph: computation graph
     :type graph: tf.Graph
@@ -56,6 +55,10 @@ class Navigation(MDP):
                     self._center.append(tf.constant(deceleration["center"], dtype=tf.float32, name="center_{}".format(i)))
                     self._decay.append(tf.constant(deceleration["decay"],  dtype=tf.float32, name="decay_{}".format(i)))
 
+            with tf.name_scope("constants/next_position"):
+                self._scale_max = tf.constant(0.1, dtype=tf.float32, name="scale_max")
+                self._max_velocity = tf.sqrt(2.0, name="max_velocity")
+
     @property
     def action_size(self):
         return self.ndim
@@ -63,109 +66,6 @@ class Navigation(MDP):
     @property
     def state_size(self):
         return self.ndim
-
-    def reward(self, state, action):
-        with self.graph.as_default():
-            with tf.name_scope("reward"):
-                r = -tf.sqrt(tf.reduce_sum(tf.square(state - self._goal), axis=1, keep_dims=True), name="r")
-        return r
-
-
-class DeterministicNavigation(Navigation):
-    """
-    DeterministicNavigation: an agent is supposed to get to a goal position
-    from a start position, subject to deceleration zones.
-
-    :param graph: computation graph
-    :type graph: tf.Graph
-    :param config: problem-dependent configuration
-    :type config: dict
-    """
-
-    def __init__(self, graph, config):
-        super().__init__(graph, config)
-
-    def transition(self, state, action):
-
-        with self.graph.as_default():
-
-            with tf.name_scope("transition"):
-
-                with tf.name_scope("deceleration"):
-
-                    d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center), 1, keep_dims=True), name="d")
-                    deceleration = self._2_00 / (self._1_00 + tf.exp(-self._decay * d)) - self._1_00
-                    decelerated_action = tf.multiply(deceleration, action, name="decelerated_action")
-
-                with tf.name_scope("next_position"):
-                    p = tf.add(state, decelerated_action, name="p")
-                    next_state = tf.clip_by_value(p, self._grid_lower_bound, self._grid_upper_bound, name="next_state")
-
-        return next_state
-
-
-class StochasticNavigation(Navigation):
-    """
-    Navigation 2D domain: an agent is supposed to get to a goal position
-    from a start position, subject to noisy directions and deceleration zones.
-
-    :param graph: computation graph
-    :type graph: tf.Graph
-    :param config: problem-dependent configuration
-    :type config: dict
-    """
-
-    def __init__(self, graph, config):
-        super().__init__(graph, config)
-
-        with self.graph.as_default():
-            with tf.name_scope("constants/distribution"):
-                self.alpha_min, self.alpha_max = config["alpha_min"], config["alpha_max"]
-                self._scale_min = tf.constant(2 * np.pi / 360 * self.alpha_min, dtype=tf.float32, name="scale_min")
-                self._scale_max = tf.constant(2 * np.pi / 360 * self.alpha_max, dtype=tf.float32, name="scale_max")
-
-    def transition(self, state, action):
-
-        with self.graph.as_default():
-
-            with tf.name_scope("transition"):
-
-                with tf.name_scope("deviation"):
-                    velocity = tf.norm(action, axis=1, keep_dims=True, name="velocity")
-                    max_velocity = tf.sqrt(2.0, name="max_velocity")
-                    scale = tf.maximum(self._scale_min, self._scale_max / max_velocity * velocity, name="scale")
-                    loc = tf.constant(0.0, name="loc")
-                    noise = tf.distributions.Normal(loc=loc, scale=scale, name="noise")
-                    alpha = noise.sample(name="alpha")
-
-                with tf.name_scope("direction"):
-                    cos, sin = tf.cos(alpha, name="cos_alpha"), tf.sin(alpha, name="sin_alpha")
-                    rotation_matrix = tf.stack([cos, -sin, sin, cos], axis=1)
-                    rotation_matrix = tf.reshape(rotation_matrix, [-1, 2, 2], name="rotation_matrix")
-                    noisy_action = tf.matmul(rotation_matrix, tf.reshape(action, [-1, 2, 1]))
-                    noisy_action = tf.reshape(noisy_action, [-1, 2], name="noisy_action")
-
-                with tf.name_scope("deceleration"):
-                    d = tf.sqrt(tf.reduce_sum(tf.square(state - self._center), 1, keep_dims=True), name="d")
-                    deceleration = self._2_00 / (self._1_00 + tf.exp(-self._decay * d)) - self._1_00
-                    decelerated_noisy_direction = tf.multiply(deceleration, noisy_action, name="decelerated_noisy_direction")
-
-                with tf.name_scope("next_position"):
-                    p = tf.add(state, decelerated_noisy_direction, name="p")
-                    next_state = tf.clip_by_value(p, self._grid_lower_bound, self._grid_upper_bound, name="next_state")
-
-        return next_state, None
-
-
-class NoisyNavigation(Navigation):
-
-    def __init__(self, graph, config):
-        super().__init__(graph, config)
-
-        with self.graph.as_default():
-            with tf.name_scope("constants/distribution"):
-                self._scale_max = tf.constant(0.1, dtype=tf.float32, name="scale_max")
-                self._max_velocity = tf.sqrt(2.0, name="max_velocity")
 
     def transition(self, state, action):
 
@@ -188,3 +88,9 @@ class NoisyNavigation(Navigation):
                 next_state_dist = tf.distributions.Normal(loc=loc, scale=scale, name="next_state_dist")
 
         return next_state_dist
+
+    def reward(self, state, action):
+        with self.graph.as_default():
+            with tf.name_scope("reward"):
+                r = -tf.sqrt(tf.reduce_sum(tf.square(state - self._goal), axis=1, keep_dims=True), name="r")
+        return r
