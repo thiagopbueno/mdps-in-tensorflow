@@ -12,8 +12,9 @@ $ python3 tf_mdp/main.py --help
 ```
 
 ```shell
-$ python3 tf_mdp/main.py --mode pg -m navigation-small-1-zone -e 100 -lr 0.01 -t 8 --log-dir results/pg/navigation-small-1-zone/ -ts 10
+$ python3 tf_mdp/main.py --mode pg -m navigation-small-no-deceleration -e 100 -lr 0.01 -t 8 --log-dir results/pg/navigation-small-no-deceleration/
 
-$ python3 tf_mdp/main.py --mode pg -m navigation-small-2-zones -e 100 -lr 0.01 -t 15 --log-dir results/pg/navigation-small-2-zones/ -ts 10
+$ python3 tf_mdp/main.py --mode pg -m navigation-small-1-zone -e 100 -lr 0.01 -t 8 --log-dir results/pg/navigation-small-1-zone/
 
+$ python3 tf_mdp/main.py --mode pg -m navigation-small-2-zones -e 100 -lr 0.01 -t 15 --log-dir results/pg/navigation-small-2-zones/
 ```

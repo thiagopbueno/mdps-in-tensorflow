@@ -16,7 +16,7 @@ import sys
 
 def plot_grid(ax, grid):
     lower, upper = grid["size"]
-    ax.axis([lower, upper] * 2)
+    ax.axis([lower[0], upper[0], lower[1], upper[1]])
     ax.set_aspect("equal")
     ax.set_xlabel("x coordinate")
     ax.set_ylabel("y coordinate")
@@ -25,7 +25,7 @@ def plot_grid(ax, grid):
 
 def plot_deceleration(ax, grid, npoints=1000):
     lower, upper = grid["size"]
-    X, Y = np.meshgrid(np.linspace(lower, upper, npoints), np.linspace(lower, upper, npoints))
+    X, Y = np.meshgrid(np.linspace(lower[0], upper[0], npoints), np.linspace(lower[1], upper[1], npoints))
     Lambda = 1.0
     for zone in grid["deceleration"]:
         xcenter, ycenter = zone["center"]
