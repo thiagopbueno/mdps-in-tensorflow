@@ -91,6 +91,7 @@ class PolicyGradientOptimizer(object):
         with self.mdp.graph.as_default():
             with tf.name_scope("pg_optimizer"):
                 self._discount_schedule()
+                self._discounted_reward()
                 self._total_discounted_reward()
                 self._reward_to_go()
                 self._loss()
@@ -103,16 +104,18 @@ class PolicyGradientOptimizer(object):
         discount_schedule = np.reshape(discount_schedule, (self.batch_size, self.max_time, 1))
         self.discount_schedule = tf.constant(discount_schedule, dtype=tf.float32, name="discount_schedule")
 
+    def _discounted_reward(self):
+        self.discounted_reward = tf.multiply(self.trajectory.rewards, self.discount_schedule, name="discount_reward")
+
     def _total_discounted_reward(self):
-        self.total_discounted_reward = tf.multiply(self.trajectory.rewards, self.discount_schedule, name="total_discount_reward")
+        self.total_discounted_reward = tf.reduce_sum(self.discounted_reward, axis=1, name="total_discounted_reward")
 
     def _reward_to_go(self):
-        self.Q = tf.cumsum(self.total_discounted_reward, axis=1, exclusive=True, reverse=True, name="Q")
+        self.Q = tf.cumsum(self.discounted_reward, axis=1, exclusive=True, reverse=True, name="Q")
         self.baseline = tf.reduce_mean(self.Q, axis=0, name="baseline")
 
     def _loss(self):
-        self.total = tf.reduce_sum(self.total_discounted_reward, axis=1, name="total")
-        self.loss = tf.reduce_mean(self.total, axis=0, name="loss")
+        self.loss = tf.reduce_mean(self.total_discounted_reward, axis=0, name="loss")
 
     def _surrogate_loss(self):
         self._cell = PolicyGradientCell(self.mdp, self.policy)
