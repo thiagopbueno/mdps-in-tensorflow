@@ -42,7 +42,7 @@ def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate):
         loss = tf.reduce_mean(tf.square(total), name="loss") # Mean-Squared Error (MSE)
 
     # ActionOptimizer
-    limits = config["limits"]
+    limits = config.get("limits", None)
     metrics = {
         "loss":  loss,
         "total": total,
@@ -51,5 +51,4 @@ def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate):
         "rewards": rewards
     }
     optimizer = ActionOptimizer(mdp.graph, metrics, learning_rate, limits)
-
     return optimizer.minimize(epochs)
