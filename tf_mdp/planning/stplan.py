@@ -13,33 +13,27 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-from evaluation.montecarlo import MCPolicyEvaluation
+from evaluation import utils
 from evaluation.mrm import MarkovRecurrentModel
 from policy.deterministic import DeterministicPolicyNetwork
-from train.optimizer import SGDPolicyOptimizer
+from train.policy_optimizer import PolicyOptimizer
 
 import tensorflow as tf
 
 
-def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate):
+def run(mdp, config, max_time, batch_size, discount, epochs, learning_rate):
 
     # PolicyNetwork
     shape = [mdp.state_size + 1, 20, 5, mdp.action_size]
     policy = DeterministicPolicyNetwork(mdp.graph, shape)
 
-    # PolicyEvaluation
+    # MarkovRecurrentModel
     start = config["initial"]
-    mc = MCPolicyEvaluation(mdp, policy,
-                            initial_state=start,
-                            max_time=timesteps,
-                            batch_size=batch_size,
-                            gamma=discount)
+    initial_state = utils.initial_state(start, batch_size)
+    timesteps = utils.timesteps(batch_size, max_time)
+    trajectory = MarkovRecurrentModel(mdp, policy).unroll(initial_state, timesteps)
 
     # PolicyOptimizer
-    metrics = {
-        "loss":  mc.expected_return,
-        "total": mc.total
-    }
-    optimizer = SGDPolicyOptimizer(mdp.graph, metrics, learning_rate)
+    optimizer = PolicyOptimizer(mdp.graph, trajectory, learning_rate, discount)
 
     return optimizer.minimize(epochs)

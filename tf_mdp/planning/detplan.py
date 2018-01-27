@@ -15,7 +15,6 @@
 
 from policy.deterministic import DeterministicPolicyNetwork
 from train.action_optimizer import ActionOptimizer
-from evaluation.rnn import DeterministicMarkovCell, MarkovRecurrentModel
 
 import numpy as np
 import tensorflow as tf
@@ -23,16 +22,15 @@ import tensorflow as tf
 
 def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate):
 
-    # Action variables
+    # action variables
     with mdp.graph.as_default():
         plan = tf.Variable(
             tf.truncated_normal(shape=[batch_size, timesteps, mdp.state_size], stddev=0.05),
             name="plan")
 
+    # ActionOptimizer
     start = config["initial"]
     limits = config.get("limits", None)
-
-    # ActionOptimizer
     optimizer = ActionOptimizer(mdp, start, plan, learning_rate, limits)
 
     return optimizer.minimize(epochs)

@@ -13,14 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-import abc
-import time
-
 import numpy as np
 import tensorflow as tf
+import time
 
 
-class PolicyOptimizer(metaclass=abc.ABCMeta):
+class PolicyOptimizer(object):
     """
     PolicyOptimizer: interface for implementations of policy network optimizers.
 
@@ -32,27 +30,37 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
     :type learning_rate: float
     """
 
-    def __init__(self, graph, metrics, learning_rate):
+    def __init__(self, graph, trajectory, learning_rate, gamma):
         self.graph = graph
+        self.trajectory = trajectory
+        self.learning_rate = learning_rate
+        self.gamma = gamma
 
-        # performance metrics
-        self.loss = metrics["loss"]
-        self.total = metrics["total"]
-
-        # hyperparameters
-        self.hyperparameters = {}
-        self.hyperparameters["learning_rate"] = learning_rate
+        self.batch_size = self.trajectory.states.shape[0].value
+        self.max_time = self.trajectory.states.shape[1].value
 
         with self.graph.as_default():
-            self._build_optimization_ops()
+            with tf.name_scope("policy_optimizer"):
+                self._discount_schedule()
+                self._total_discounted_reward()
+                self._loss()
+                self._train_op()
 
-    @abc.abstractmethod
-    def _build_optimization_ops(self):
-        raise NotImplementedError
+    def _discount_schedule(self):
+        discount_schedule = np.geomspace(1, self.gamma ** (self.max_time - 1), self.max_time, dtype=np.float32)
+        discount_schedule = np.repeat([discount_schedule], self.batch_size, axis=0)
+        discount_schedule = np.reshape(discount_schedule, (self.batch_size, self.max_time, 1))
+        self.discount_schedule = tf.constant(discount_schedule, dtype=tf.float32, name="discount_schedule")
 
-    @abc.abstractproperty
-    def learning_rate(self):
-        raise NotImplementedError
+    def _total_discounted_reward(self):
+        self.total_discounted_reward = tf.reduce_sum(self.trajectory.rewards * self.discount_schedule, axis=1, name="total_discount_reward")
+
+    def _loss(self):
+        self.loss = tf.reduce_mean(self.total_discounted_reward, axis=0, name="loss")
+
+    def _train_op(self):
+        self._optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+        self.train_op = self._optimizer.minimize(-self.loss)
 
     def minimize(self, epoch, show_progress=True):
 
@@ -65,7 +73,7 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
             for epoch_idx in range(epoch):
 
                 # backprop and update weights
-                _, loss, total = sess.run([self.train_step, self.loss, self.total])
+                _, loss = sess.run([self.train_op, self.loss])
 
                 # store results
                 losses.append(loss[0])
@@ -82,34 +90,3 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
             "losses": losses,
             "uptime": uptime
         }
-
-
-class SGDPolicyOptimizer(PolicyOptimizer):
-    """
-    SGDPolicyOptimizer: policy network optimizer based on Stochastic Gradient Descent.
-
-    :param graph: computation graph
-    :type graph: tf.Graph
-    :param loss: loss function to be optimized
-    :type loss: tf.Tensor(shape(1,))
-    :param learning_rate: optimization hyperparameter
-    :type learning_rate: float
-    """
-
-    def __init__(self, graph, metrics, learning_rate):
-        super().__init__(graph, metrics, learning_rate)
-
-    def _build_optimization_ops(self):
-        learning_rate = self.hyperparameters["learning_rate"]
-        with tf.name_scope("SGDPolicyOptimizer"):
-            self._optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-            self.train_step = self._optimizer.minimize(-self.loss)
-
-    @property
-    def learning_rate(self):
-        """
-        Returns hyperparameter learning rate as used by SGD optimizer.
-
-        :rtype: float
-        """
-        return self._optimizer._learning_rate

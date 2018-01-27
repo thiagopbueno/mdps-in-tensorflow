@@ -89,12 +89,13 @@ class PolicyGradientOptimizer(object):
         self.max_time = self.trajectory.states.shape[1].value
 
         with self.mdp.graph.as_default():
-            self._discount_schedule()
-            self._total_discounted_reward()
-            self._reward_to_go()
-            self._loss()
-            self._surrogate_loss()
-            self._train_op()
+            with tf.name_scope("pg_optimizer"):
+                self._discount_schedule()
+                self._total_discounted_reward()
+                self._reward_to_go()
+                self._loss()
+                self._surrogate_loss()
+                self._train_op()
 
     def _discount_schedule(self):
         discount_schedule = np.geomspace(1, self.gamma ** (self.max_time - 1), self.max_time, dtype=np.float32)
