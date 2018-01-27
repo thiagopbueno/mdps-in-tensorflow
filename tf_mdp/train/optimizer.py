@@ -178,7 +178,10 @@ class PolicyGradientOptimizer():
         uptime = end - start
         print("\nDone in {0:.6f} sec.\n".format(uptime))
 
-        return losses
+        return {
+            "losses": losses,
+            "uptime": uptime
+        }
 
 
 class PolicyOptimizer(metaclass=abc.ABCMeta):
@@ -239,7 +242,10 @@ class PolicyOptimizer(metaclass=abc.ABCMeta):
         uptime = end - start
         print("\nDone in {0:.6f} sec.\n".format(uptime))
 
-        return losses
+        return {
+            "losses": losses,
+            "uptime": uptime
+        }
 
 
 class SGDPolicyOptimizer(PolicyOptimizer):
@@ -338,22 +344,26 @@ class ActionOptimizer(object):
                 loss = sess.run(self.loss)
                 losses.append(loss)
                 if show_progress and epoch_idx % 10 == 0:
-                    print('Epoch {0:5}: loss = {1}\r'.format(epoch_idx, loss), end='')
+                    print('Epoch {0:5}: loss = {1}\r'.format(epoch_idx, loss), end="")
 
             # index of best solution among all planners
             with tf.name_scope("best_batch"):
                 best_batch_idx = tf.argmax(self.total, axis=0, name="best_batch_index")
                 best_batch_idx = sess.run(best_batch_idx)
                 best_batch = {
-                    "total":   np.squeeze(sess.run(self.total)[best_batch_idx]),
-                    "actions": np.squeeze(sess.run(self.actions)[best_batch_idx]),
-                    "states":  np.squeeze(sess.run(self.states)[best_batch_idx]),
-                    "rewards": np.squeeze(sess.run(self.rewards)[best_batch_idx])
+                    "total":   np.squeeze(sess.run(self.total)[best_batch_idx]).tolist(),
+                    "actions": np.squeeze(sess.run(self.actions)[best_batch_idx]).tolist(),
+                    "states":  np.squeeze(sess.run(self.states)[best_batch_idx]).tolist(),
+                    "rewards": np.squeeze(sess.run(self.rewards)[best_batch_idx]).tolist()
                 }
+                print("\nBest batch total = {0:.4f}".format(best_batch["total"]))
 
         end = time.time()
         uptime = end - start
-        print("\nDone in {0:.6f} sec.\n".format(uptime))
+        print("Done in {0:.4f} sec.\n".format(uptime))
 
-        # return losses, best_batch, uptime
-        return losses
+        return {
+            "losses": losses,
+            "solution": best_batch,
+            "uptime": uptime
+        }

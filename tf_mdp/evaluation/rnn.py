@@ -57,7 +57,7 @@ class DeterministicMarkovCell(MarkovCell):
             with tf.name_scope("transition_cell"):
                 action = inputs
                 next_state_dist = self.mdp.transition(state, action)
-                next_state = next_state_dist.sample(name="next_state")
+                next_state = next_state_dist.loc
 
             with tf.name_scope("reward_cell"):
                 reward = self.mdp.reward(state, action)

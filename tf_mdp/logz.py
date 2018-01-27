@@ -13,9 +13,22 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
-import csv
+import json
+import numpy as np
 import os
 import time
+
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(NumpyEncoder, self).default(obj)
 
 
 def logging(log_dir, data):
@@ -24,19 +37,14 @@ def logging(log_dir, data):
             os.mkdir(log_dir)
 
         timestamp = time.strftime("%Y-%m-%d-%H-%M-%S")
-        csv_file = os.path.join(log_dir, timestamp + ".dat")
-        print(">> " + csv_file)
+        file_path = os.path.join(log_dir, timestamp + ".json")
+        print(">> " + file_path)
 
-        with open(csv_file, 'w') as csvfile:
-            writer = csv.writer(csvfile)
+        with open(file_path, "w") as file:
+            data = json.dumps(data, cls=NumpyEncoder, sort_keys=True, indent=4)
+            file.write(data)
 
-            # header
-            writer.writerow(sorted(data.keys()))
-
-            # content
-            values = [data[key] for key in sorted(data)]
-            for row in zip(*values):
-                writer.writerow(row)
+        return file_path
 
     except IOError:
-        print("I/O error", csv_file)
+        print("I/O error", file_path)
