@@ -16,7 +16,7 @@
 from evaluation.montecarlo import MCPolicyEvaluation
 from evaluation.mrm import MarkovRecurrentModel
 from policy.deterministic import DeterministicPolicyNetwork
-from train.optimizer import SGDPolicyOptimizer, PolicyGradientOptimizer
+from train.optimizer import SGDPolicyOptimizer
 
 import tensorflow as tf
 

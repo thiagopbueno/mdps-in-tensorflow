@@ -16,7 +16,7 @@
 from evaluation import utils
 from evaluation.mrm import MarkovRecurrentModel
 from policy.deterministic import DeterministicPolicyNetwork
-from train.optimizer import PolicyGradientOptimizer
+from train.pg_optimizer import PolicyGradientOptimizer
 
 import tensorflow as tf
 
