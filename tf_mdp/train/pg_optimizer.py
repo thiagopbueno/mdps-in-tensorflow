@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with TF-MDP.  If not, see <http://www.gnu.org/licenses/>.
 
+import math
 import numpy as np
 import tensorflow as tf
 import time
@@ -168,6 +169,10 @@ class PolicyGradientOptimizer(object):
                     self._Q: Q
                 }
                 loss, _ = sess.run([self.loss, self.train_op], feed_dict=feed_dict)
+
+                if math.isnan(loss[0]):
+                    break
+
                 losses.append(loss[0])
 
                 # Show progress
