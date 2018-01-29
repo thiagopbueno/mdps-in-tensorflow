@@ -31,6 +31,18 @@ class NumpyEncoder(json.JSONEncoder):
             return super(NumpyEncoder, self).default(obj)
 
 
+def serialize(file_path, data):
+    with open(file_path, "w") as file:
+        data = json.dumps(data, cls=NumpyEncoder, sort_keys=True, indent=4)
+        file.write(data)
+
+
+def deserialize(file_path):
+    with open(file_path, "r") as file:
+        data = json.loads(file.read())
+        return data
+
+
 def logging(log_dir, data):
     try:
         if not os.path.exists(log_dir):
@@ -39,10 +51,7 @@ def logging(log_dir, data):
         timestamp = time.strftime("%Y-%m-%d-%H-%M-%S")
         file_path = os.path.join(log_dir, timestamp + ".json")
         print(">> " + file_path)
-
-        with open(file_path, "w") as file:
-            data = json.dumps(data, cls=NumpyEncoder, sort_keys=True, indent=4)
-            file.write(data)
+        serialize(file_path, data)
 
         return file_path
 

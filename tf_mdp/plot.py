@@ -18,20 +18,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
+import logz
 
-def load_results(filename):
-    data = np.loadtxt(filename, delimiter=",", skiprows=1)
-    results = []
-    for _ in range(len(data[0])):
-        results.append([])
-    for values in data:
-        for i, v in enumerate(values):
-            results[i].append(v)
+
+def load_results(file_path):
+    results = logz.deserialize(file_path)
     return results
 
 
-def plot_losses(data, title):
-    for line in data:
+def plot_losses(data, **kwargs):
+    for trial in data:
+        line = data[trial]["losses"]
         plt.plot(line)
     plt.xlabel("Epochs")
     plt.ylabel("Loss function J = $V(\\mathbf{s}_0)$")
@@ -41,7 +38,7 @@ def plot_losses(data, title):
 
 
 if __name__ == '__main__':
-    filename = sys.argv[1]
+    file_path = sys.argv[1]
     title = sys.argv[2]
-    data = load_results(filename)
-    plot_losses(data, title)
+    data = load_results(file_path)
+    plot_losses(data, title=title)
