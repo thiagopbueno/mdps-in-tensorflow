@@ -33,6 +33,7 @@ def parse_args():
     parser.add_argument("--learning-rate", "-lr", type=float, default=1.0e-5)
     parser.add_argument("--trials",        "-ts", type=int,   default=5)
     parser.add_argument("--log-dir",       "-lg", type=str,   default="/tmp/")
+    parser.add_argument("--baseline", action="store_true")
     args = parser.parse_args()
     show_parameters_info(args)
     return args
@@ -61,12 +62,13 @@ def load_model(model_id):
 def run_planner(planner, args):
     trials = {}
     for i in range(args.trials):
-        print(">> Starting trial #{} ...".format(i))
+        print(">> Starting trial #{} ...".format(i + 1))
         mdp, config = load_model(args.model)
         losses = planner.run(
                     mdp, config,
                     args.timesteps, args.batch_size,
-                    args.discount, args.epochs, args.learning_rate)
+                    args.discount, args.epochs, args.learning_rate,
+                    baseline=args.baseline)
         trials["run{}".format(i)] = losses
     return trials
 

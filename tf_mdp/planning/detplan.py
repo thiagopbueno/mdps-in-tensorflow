@@ -20,7 +20,7 @@ import numpy as np
 import tensorflow as tf
 
 
-def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate):
+def run(mdp, config, timesteps, batch_size, discount, epochs, learning_rate, **kwargs):
 
     # action variables
     with mdp.graph.as_default():

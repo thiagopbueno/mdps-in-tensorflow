@@ -21,7 +21,7 @@ from train.policy_optimizer import PolicyOptimizer
 import tensorflow as tf
 
 
-def run(mdp, config, max_time, batch_size, discount, epochs, learning_rate):
+def run(mdp, config, max_time, batch_size, discount, epochs, learning_rate, **kwargs):
 
     # PolicyNetwork
     shape = [mdp.state_size + 1, 20, 5, mdp.action_size]
