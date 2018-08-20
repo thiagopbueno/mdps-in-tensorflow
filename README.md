@@ -1,3 +1,6 @@
+# This project is deprecated. Please visit [tf-mdp](https://github.com/thiagopbueno/tf-mdp).
+
+
 # tf-mdp
 
 Representation and solution of continuous state-action MDPs in TensorFlow.

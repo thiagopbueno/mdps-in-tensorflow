@@ -24,6 +24,14 @@ import pkgutil
 # print([name for _, name, _ in pkgutil.iter_modules(['.'])])
 # print([name for _, name, _ in pkgutil.iter_modules([PATH])])
 
+def get_config(problem_id):
+    with open(MODELS, 'r') as file:
+        metadata = json.loads(file.read())[problem_id]
+        module = metadata["module"]
+        class_name = metadata["class_name"]
+        config = metadata["config"]
+        return config
+
 def make(problem_id):
     with open(MODELS, 'r') as file:
         metadata = json.loads(file.read())[problem_id]
